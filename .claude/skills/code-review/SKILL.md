@@ -1,0 +1,155 @@
+---
+name: code-review
+description: 写完代码、提交前或合并 PR 时使用；用户说“帮我 review”“提交前检查一下”“看看这次改动”“PR review”，或要求严格审查/合入门禁时也使用。
+---
+
+# 代码审查
+
+> 检查代码缺陷、测试质量和变更影响，并确认已发现的问题是否闭环。
+
+## 资源与执行位置
+
+- `references/`、`scripts/`、`assets/` 均相对本次读取的 `SKILL.md` 所在目录。
+- shell 命令从**被审项目根目录**执行；`docs/work/`、代码路径与项目规则均属于被审项目。
+- 下文的 `CODE_REVIEW_SKILL_DIR` 指 skill 安装目录的绝对路径。每次 shell 调用都设置它，
+  或直接用实际绝对路径替换；不要假定不同 shell 调用会保留变量。
+- 脚本需要 Bash、Git、awk、grep、sed 等基础命令。通过 `bash` 调用，无需依赖可执行位。
+- 报告解析需要 Python 3.9+ 和 PyYAML；默认调用 `python`，可用 `CODE_REVIEW_PYTHON` 指定解释器绝对路径。
+- 独立 reviewer 的完整说明在 `references/reviewer.md`。`.claude/agents/reviewer.md`
+  是本项目的 Claude Code 适配配置，复制 skill 到其他宿主时由宿主提供独立上下文能力。
+
+## 适用范围
+
+- 审查影响代码行为的功能、bug 修复、重构或配置变更。
+- 不影响代码行为的纯文档、格式或错别字改动可跳过。
+- 测试失败或尚未运行时仍可静态审查；报告须注明测试状态，不得宣称已满足合入条件。
+
+## 输入
+
+| 输入 | 必需 | 说明 |
+|---|---|---|
+| git 仓库 + 可 diff 的改动 | 是 | 明确审查未提交改动，还是已提交的 base/head 区间 |
+| 验收标准 | 否 | 提供时按“可选收尾”逐条勾验 |
+| 覆盖率数据 / 命令 | 否 | 提供时用于 `test-coverage` 的可选测量；未提供时仍执行相关测试代码的静态质量检查 |
+| 规则包 | 否 | 默认 skill 内置 `references/rules/`；可用 `CODE_REVIEW_RULES_DIR` 覆盖 |
+| 审查标识 | 否 | `{slug}`，默认 `<日期>-<主题>` |
+
+产物根目录为 `docs/work`，本次产物写入 `docs/work/active/{slug}/`。
+
+## 审查流程
+
+> 检查项不写死在本文件里，由 `references/probes.yaml` 注册表驱动。
+> 探针的实现细节在 `references/probes/<探针名>.md`；本文件只管**编排**。
+>
+> **执行边界：默认进行静态审查。** 覆盖率检查优先复用已有报告；
+> 需要测量时，可在本轮任务允许的范围内执行覆盖率命令。其他检查仍只读证据。
+> 审查过程中不得修改被审源代码。测试与 CI 输出作为审查证据，
+> **测试全绿不等于行为正确**。
+
+1. **确定审查范围**：
+
+   **选择模式**，未指定时默认审查未提交改动。下文的 base/head 均记录为具体 commit ID。
+
+   - **未提交改动（worktree）**：base 为当前 HEAD。
+     用 `git diff <base> --` 收集暂存与未暂存改动；
+     用 `git ls-files --others --exclude-standard -z` 收集未跟踪文件，
+     并将其完整内容作为新增代码审查。
+   - **已提交区间（commits）**：按用户指定的 base/head，
+     用 `git diff <base> <head> --` 收集差异。
+     省略 head 时使用当前 HEAD，只审查该提交区间。
+
+   **读取对应源码**：
+   - worktree 模式读取工作区文件。
+   - commits 模式用 `git show <head>:<路径>` 读取目标版本，
+     需要旧版本时读取 base。文件扫描仅使用与目标版本一致的磁盘文件。
+
+   **记录并交接**：保存模式、base、目标（工作区或 head）、变更文件清单及差异，
+   供所有探针和 reviewer 使用。程序处理文件清单时使用 NUL 分隔，并逐路径引用传参。
+
+   收集完成后，再创建报告目录 `docs/work/active/{slug}/probes/`，
+   避免将新生成的报告纳入待审查文件。
+
+2. **读注册表，确定探针清单**：Read `references/probes.yaml`，按 `requires` 判断：
+   - 指定了但缺失 / 不可读 → `error`
+   - 未提供可选输入 → `skipped`，写明缺什么
+   - 可用 → 执行
+
+3. **依次执行探针**（顺序执行，不并行）：
+   对清单里的每个探针：
+   1. Read `references/probes/<探针名>.md`，按其步骤执行
+   2. 按 `references/output-schema.md` 产出 finding，写入 `docs/work/active/{slug}/probes/<探针名>.json`
+   所有探针均须有 JSON 记录，正常跳过或执行错误也写明原因。写完后统一同步，不手填计数：
+   ```bash
+   bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug} --probes
+   ```
+
+4. **裁决（按 `reviewer` 配置）**：
+
+   运行：
+   ```bash
+   DECISION="$(bash "$CODE_REVIEW_SKILL_DIR/scripts/review-mode" {slug} --base <base>)"
+   ```
+   - `run` → 用宿主的独立上下文工具派发 reviewer（Claude Code：`subagent_type: reviewer`），执行 `references/reviewer.md`。
+   - `skip reason=...` → 不派发，在产物目录的 `reviewer.json` 记录 decision、reason 和空数组。
+
+   派发时提供 skill 路径、项目根、`{slug}`、产物目录、审查模式、base、目标（工作区或 head）、
+   变更文件清单及差异，并明确按“确定审查范围”中约定的方式读取源码。
+
+   返回的 JSON **原样**保存到 `reviewer.json`，复核补充说明写入报告 §6 的非自动区域；
+   未完成裁决的 finding 保持原判及 `status=open`，不得代补裁决。
+
+5. **reconciliation 完整性检查**：
+   从探针 JSON 和 `reviewer.json` 自动派生最终计数：
+   ```bash
+   bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug}
+   ```
+   没有 critical/high 也须执行，显式记录零结果；格式错误须修正，不能用旧计数或手填数字代替。
+   有未处置问题（`RECONCILE_PENDING > 0`）时，本轮仍交付报告并列明阻塞项，不得推进合入。
+   后续修复任务完成后，再复审受影响的部分；重派上限见 `references/probes.yaml` 的 `execution.max_retry`。
+
+6. **汇总报告**：按输出契约汇总 findings、未验证项及阻塞结论。
+   若提供了验收标准，须先按“可选收尾”完成勾验，再形成最终结论。
+   按模板撰写范围、解释、修复建议和限制，保留自动区域标记；原始 JSON 不写入正文。
+   执行以下命令直接生成事实区域并校验，不经模型复制表格：
+   ```bash
+   bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" render-report {slug}
+   bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" verify-report {slug}
+   ```
+   向用户汇报结果，**等待确认**后再进入下一步。
+
+## <HARD-GATE>
+
+**以下任一条件命中，阻塞合入**。本轮报告列明阻塞项，下表为后续处置要求：
+
+| 阻塞条件 | 后续动作 |
+|---|---|
+| required 探针为 `failed` / `error`（`PROBE_REQUIRED_FAILED > 0`） | 处理已发现的问题或执行错误后，重跑对应探针 |
+| critical/high finding 未完成 reconciliation（`RECONCILE_PENDING > 0`） | 按步骤 5 处理，修复后重派受影响的探针 |
+| reconcile 从未上报（`RECONCILE_REPORTED=0`） | 完成步骤 5；没有 critical/high 也须执行最终同步 |
+| `reviewer.policy=strict` 且 decision=`skip`，同时存在 open 的 critical/high | 按步骤 4 处理，未处置的 finding 不得放行 |
+| 提供了覆盖率数据且低于基线（默认增量行覆盖率 < 85%） | 列明覆盖缺口，补测试后重新审查 |
+| 提供了验收标准且未全过，或标准本身有歧义 | 列明未通过项；有歧义先澄清，不得自行勾验通过 |
+| 有 critical/high finding 停在 `wontfix` | 按输出契约完成处置，不能用“不修”冲抵待办 |
+
+`skipped` 不算失败；已指定输入缺失 / 不可读、命令失败记为 `error`，
+修复输入或工具问题后重跑，不得当作 `passed`。执行状态是否直接阻塞由 `required` 决定。
+
+脚本验证报告记录与计数的一致性，不能证明检查是否充分或 reviewer 是否实际派发。
+
+## 输出契约
+
+- **主报告**：`docs/work/active/{slug}/code-review.md`，按
+  `assets/code-review.md` 的章节和填写要求生成。
+- **机器记录**：`docs/work/active/{slug}/probes/<探针名>.json` 和 `reviewer.json`，
+  格式见 `references/output-schema.md`；人类报告的事实区域由它们派生。
+
+## 可选收尾
+
+以下事项按条件执行，不作为每轮必经步骤：
+
+- **验收**：提供了验收标准时，在最终结论前逐条勾验；没有则跳过并说明。
+- **lessons**：有 `lessons/` 目录，且本次有实际发生、值得复用的经验时记录，说明具体问题、原因和处理方式：
+  - 实现过程中踩的坑 → `lessons/pitfalls.md`
+  - AI 产出被纠正的案例 → `lessons/bad-cases.md`
+  - 新的架构决策 → `lessons/arch-decisions.md`
+- **归档**：如需归档，将 `docs/work/active/{slug}/` 移到 `docs/work/archive/{YYYY}/`。
