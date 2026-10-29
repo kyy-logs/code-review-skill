@@ -169,6 +169,7 @@ The reviewer gets the frozen skill, the case inputs, and the raw probe bundle â€
 <details>
 <summary>11-case historical Java regression (2026-10-29)</summary>
 
+- Baseline: commit `494a39bb`, before `behavior-review` was extracted into a standalone probe. The snapshot validates the shared finding and gate contract, not the four-probe split itself.
 - 11/11 cases completed; reviewer off; static review.
 - Original behavior targets: 5/5 hit.
 - Clean and fixed controls: 4/4 passed without false blocking.
