@@ -21,6 +21,12 @@ reviewer:
 # requires 列出输入依赖；rules 默认使用内置规则，覆盖率由 test-coverage 内部可选处理。
 
 probes:
+  - name: behavior-review
+    title: 行为正确性
+    file: references/probes/behavior-review.md
+    required: true
+    requires: []
+
   - name: test-coverage
     title: 测试质量与增量覆盖率
     file: references/probes/test-coverage.md

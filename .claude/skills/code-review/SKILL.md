@@ -75,9 +75,14 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
    - 可用 → 执行
 
 3. **依次执行探针**（顺序执行，不并行）：
+   由同一主执行器按注册顺序执行，复用本轮范围、diff 和已读取的目标版本上下文；仅按需补读。
    对清单里的每个探针：
    1. Read `references/probes/<探针名>.md`，按其步骤执行
-   2. 按 `references/output-schema.md` 产出 finding，写入 `docs/work/active/{slug}/probes/<探针名>.json`
+   2. 按 `references/output-schema.md` 统一定级、记录执行状态及 findings，写入 `docs/work/active/{slug}/probes/<探针名>.json`
+
+   某探针执行错误时，以 `error` 记录原因并保留已发现的问题，继续其余探针；最终按 required 和 findings 判断阻塞。
+   同根因、同后果的问题引用首次 finding ID，补充证据写入报告 §5 的非自动区域，不重复建项或改写原探针 JSON；独立问题须说明区别。
+
    所有探针均须有 JSON 记录，正常跳过或执行错误也写明原因。写完后统一同步，不手填计数：
    ```bash
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug} --probes
@@ -131,8 +136,7 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
 | 提供了验收标准且未全过，或标准本身有歧义 | 列明未通过项；有歧义先澄清，不得自行勾验通过 |
 | 有 critical/high finding 停在 `wontfix` | 按输出契约完成处置，不能用“不修”冲抵待办 |
 
-`skipped` 不算失败；已指定输入缺失 / 不可读、命令失败记为 `error`，
-修复输入或工具问题后重跑，不得当作 `passed`。执行状态是否直接阻塞由 `required` 决定。
+执行状态与输入错误的判定见 `references/output-schema.md` 第 4 节。
 
 脚本验证报告记录与计数的一致性，不能证明检查是否充分或 reviewer 是否实际派发。
 
