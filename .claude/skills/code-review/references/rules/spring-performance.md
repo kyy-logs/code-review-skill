@@ -30,13 +30,10 @@ public class UserCreateRequest {
 ```java
 // 正确：事务范围明确
 @Transactional(rollbackFor = Exception.class)
-public void transfer(Long fromId, Long toId, BigDecimal amount) {
-    Account from = accountDao.getById(fromId);
-    Account to = accountDao.getById(toId);
-    from.debit(amount);
-    to.credit(amount);
-    accountDao.update(from);
-    accountDao.update(to);
+public void createUser(User user, UserProfile profile) {
+    userDao.insert(user);
+    profile.setUserId(user.getId());
+    profileDao.insert(profile);
 }
 
 // 注意：只读操作不加事务或使用只读事务

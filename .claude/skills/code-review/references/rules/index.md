@@ -14,7 +14,7 @@
 
 | 文件 | 类型 | 内容 |
 |---|---|---|
-| `baseline-java.md` | 可机判 | 11 条带检测模式的基线规则 |
+| `baseline-java.md` | 可机判 / 语义检查 | 9 条基线规则 |
 | `concurrency.md` | 散文 | 线程池、SimpleDateFormat、锁顺序 |
 | `exception-logging.md` | 散文 | 异常捕获、事务回滚、日志 |
 | `naming-format.md` | 散文 | 命名与格式 |

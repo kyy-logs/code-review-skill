@@ -1,6 +1,6 @@
 # 公共基线（Java）
 
-最小可用规则集，覆盖资损、安全、并发、异常四类高频问题。
+最小可用规则集，覆盖安全、并发、异常三类高频问题。
 按项目实际技术栈增删；替换本文件不会影响 `SKILL.md` 的编排逻辑。
 
 ## 安全
@@ -49,20 +49,6 @@ SQL 必须使用参数绑定，禁止把用户输入拼进语句。
 
 **检测模式**:
 - `log(ger)?\.(info|debug|warn|error)\([^)]*(idCard|idNo|phone|mobile|bankCard|password|token)`
-
-### MONEY-001 [CRITICAL] 浮点存金额
-
-金额必须用整数最小单位或 BigDecimal，禁止 float / double。
-
-**检测模式**:
-- `(float|double|Float|Double)\s+(amount|price|fee|money|cost|balance|total|charge|refund)`
-
-### MONEY-002 [HIGH] 硬编码金额限额
-
-限额必须可配置，不得写死在代码里。
-
-**检测模式**:
-- `(maxAmount|minAmount|limitAmount|MAX_AMOUNT|MIN_AMOUNT)\s*=\s*[0-9]`
 
 ## 并发与异常
 
