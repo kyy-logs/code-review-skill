@@ -1,6 +1,8 @@
 # code-review-skill
 
-**Evidence-backed code review for Claude Code. Static-first, probe-driven, and gated.**
+**Evidence-backed code review. Static-first, probe-driven, and gated.**
+
+The skill source lives in [`skills/code-review/`](skills/code-review/), independently of any host's installation directory. A Claude Code reviewer adapter is included in [`adapters/claude-code/`](adapters/claude-code/). The current version is a beta candidate; see [VERSION](VERSION).
 
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-6B4FBB?style=flat-square)](https://claude.com/claude-code)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-standard-1f6feb?style=flat-square)](https://agentskills.io)
@@ -11,8 +13,26 @@ Most AI reviews stop at “this looks risky.” This skill produces a review you
 
 It never modifies the code under review.
 
+## Release status
+
+`v0.1.0-beta` — this is a test release. The probe contract, report schema, and
+gate behavior may change before 1.0.
+
+- **Severity is three levels:** `high`, `medium`, `low`. Records written by the
+  earlier four-level version, including any `critical` value, are **not
+  compatible**; `collect-metrics` rejects them. Re-run the review or migrate the
+  records before using them with this release.
+- **Scope:** static-first review with four probes, an optional independent
+  reviewer, and JSON-derived report/gate output. It does not replace tests, CI,
+  or human review.
+- **Validation:** 23 offline pipeline tests; a clean-project end-to-end run with
+  the reviewer and a failing gate; additional probe/reviewer smokes. These are
+  regression checks, not a general recall claim. Concurrency-defect detection
+  has not been validated.
+
 ## Contents
 
+- [Release status](#release-status)
 - [Why this skill](#why-this-skill)
 - [Quick start](#quick-start)
 - [How it works](#how-it-works)
@@ -41,17 +61,24 @@ It never modifies the code under review.
 
 ### Install
 
-Copy the skill and its reviewer adapter into your project’s `.claude` directory:
+For Claude Code, copy the skill and its reviewer adapter into your project's `.claude` directory. The source repository uses `skills/`; `.claude/` is the installation destination.
+
+For this release-candidate branch:
 
 ```bash
-git clone https://github.com/kyy-logs/code-review-skill.git
-cd your-project
+git clone --branch feat/behavior-review-probe https://github.com/kyy-logs/code-review-skill.git
+CODE_REVIEW_SOURCE_DIR="$(pwd)/code-review-skill"
+cd /path/to/your-project
 mkdir -p .claude/skills .claude/agents
-cp -r ../code-review-skill/.claude/skills/code-review .claude/skills/
-cp ../code-review-skill/.claude/agents/reviewer.md .claude/agents/
+cp -r "$CODE_REVIEW_SOURCE_DIR/skills/code-review" .claude/skills/
+cp "$CODE_REVIEW_SOURCE_DIR/adapters/claude-code/reviewer.md" .claude/agents/
 ```
 
 Claude Code discovers it as `code-review`.
+
+Both copies are needed for the Claude Code workflow: installing the skill alone does not register the independent reviewer. Install the prerequisites in [Requirements](#requirements) first. If Python cannot import PyYAML, install it with `python -m pip install PyYAML` in the interpreter used by the skill; `CODE_REVIEW_PYTHON` can select another interpreter.
+
+For another host, install the same `skills/code-review/` folder into that host's skill directory and provide its own independent-context mechanism. The portable source layout does not imply that every host has been validated; only the Claude Code adapter is supplied here.
 
 ### Run
 
@@ -101,9 +128,9 @@ scope ──► probes ──► sync ──► reviewer? ──► reconcile �
 2. **Probes** — run in registry order by one executor, reusing the same scope and diff.
 3. **Sync** — validate probe JSON and derive counts with `collect-metrics`.
 4. **Reviewer (optional)** — dispatch only when `review-mode` returns `run`.
-5. **Reconcile** — critical/high findings must be closed or explicitly rejected.
+5. **Reconcile** — high findings must be closed or explicitly rejected.
 6. **Report** — render the human report’s fact sections from JSON, then verify them.
-7. **Gate** — required-probe failures and open critical/high findings block the merge.
+7. **Gate** — required-probe failures and open high findings block the merge.
 
 ### The four probes
 
@@ -125,7 +152,7 @@ Every finding records:
 | `location` | `path:line`, or file level with a reason |
 | `summary` | What is wrong — not “consider improving” |
 | `evidence` | Contract, code path, test output, or rule ID |
-| `severity` | `critical` / `high` / `medium` / `low` |
+| `severity` | `high` / `medium` / `low` |
 | `status` | `open` / `reconciled` / `wontfix` / `false-positive` |
 
 High-severity findings must cite the actual method signature and the contract they violate, or a concrete code path. A hunch is capped at `medium` until the evidence is checked.
@@ -153,7 +180,7 @@ A project rule package **replaces** the built-in package; it is not merged with 
 
 ## Independent reviewer
 
-`references/reviewer.md` is the host-neutral reviewer script. `.claude/agents/reviewer.md` is the Claude Code adapter.
+`skills/code-review/references/reviewer.md` is the host-neutral reviewer script. `adapters/claude-code/reviewer.md` is the Claude Code adapter; after installation it lives at `.claude/agents/reviewer.md` in the reviewed project.
 
 The reviewer gets the frozen skill, the case inputs, and the raw probe bundle — not reference comments, expected answers, or prior reports. If the host cannot provide a fresh context, record that limitation; do not fabricate a verdict.
 
@@ -174,7 +201,7 @@ The reviewer gets the frozen skill, the case inputs, and the raw probe bundle �
 - Original behavior targets: 5/5 hit.
 - Clean and fixed controls: 4/4 passed without false blocking.
 - Two confirmed edge-case misses remain: legal input formatting in a parser, and a JSON representation round-trip in command rendering.
-- 33 raw findings: 0 critical, 8 high, 20 medium, 5 low; 0 confirmed false positives, with unverified items still open.
+- 33 raw findings: 8 high, 20 medium, 5 low; 0 confirmed false positives, with unverified items still open.
 - The full merge gate was not run.
 
 The evaluation harness and raw reports are kept out of the published repository. This snapshot is a regression result, not a claim of general recall.
@@ -190,23 +217,29 @@ The evaluation harness and raw reports are kept out of the published repository.
 ## Repository layout
 
 ```text
-.claude/
-├── agents/reviewer.md
-└── skills/code-review/
-    ├── SKILL.md
-    ├── assets/code-review.md
-    ├── references/
-    │   ├── probes.yaml
-    │   ├── output-schema.md
-    │   ├── reviewer.md
-    │   ├── probes/
-    │   └── rules/
-    └── scripts/
-        ├── review-mode
-        ├── collect-metrics
-        ├── lib-metrics
-        ├── rule-grep
-        └── sync-results.py
+code-review-skill/
+├── README.md
+├── LICENSE
+├── VERSION
+├── skills/
+│   └── code-review/
+│       ├── SKILL.md
+│       ├── assets/code-review.md
+│       ├── references/
+│       │   ├── probes.yaml
+│       │   ├── output-schema.md
+│       │   ├── reviewer.md
+│       │   ├── probes/
+│       │   └── rules/
+│       └── scripts/
+│           ├── review-mode
+│           ├── collect-metrics
+│           ├── lib-metrics
+│           ├── rule-grep
+│           └── sync-results.py
+├── adapters/
+│   └── claude-code/reviewer.md
+└── tests/
 ```
 
 ## Contributing
@@ -220,8 +253,8 @@ Issues and pull requests are welcome. For a behavior change, include:
 
 For a probe or schema change, update the probe document, the output contract, and the affected scripts together.
 
+Run the offline suite with `python -m unittest discover -s tests -v`. Set `CODE_REVIEW_TEST_BASH` to a Bash executable to include shell and installation checks; see [tests/README.md](tests/README.md). These checks do not call models or establish defect recall.
+
 ## License
 
-No license has been added yet. Until one is added, the repository is all rights reserved.
-
-If you intend to accept external contributions, add a license first — for example, MIT or Apache-2.0 — and update this section.
+This repository is distributed under the [MIT License](LICENSE).

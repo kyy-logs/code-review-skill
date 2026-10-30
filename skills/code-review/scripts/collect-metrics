@@ -17,8 +17,8 @@ usage() {
 子命令:
   deviation <slug> --count N --reasonable M
       偏离总数与其中合理的条数
-  security  <slug> --critical N --high N --medium M
-      安全与规范检查的违规计数
+  security  <slug> --high N --medium M --low L
+      安全与规范检查的三级违规计数
   lessons   <slug> --count N --files "a.md,b.md"
       写入的 lessons 条数与文件列表
   coverage  <slug> [--line N] [--branch N]
@@ -47,7 +47,7 @@ EOF
 # 先完整校验，再一次性追加派生事件；校验失败不写入计数。
 sync_review_results() {
   local slug="$1" phase="${2:-final}" directory skill_dir rows batch="" line
-  local node event key value ts iso details="" status required duration critical high
+  local node event key value ts iso details="" status required duration high low
   validate_slug "$slug"
   directory="$(find_slug_dir "$slug")" || die "找不到审查目录: $slug"
   skill_dir="${CODE_REVIEW_SKILL_DIR:-$(dirname "$SCRIPT_DIR")}"
@@ -67,10 +67,10 @@ sync_review_results() {
     elif [ "$event" = metric:probe ]; then
       case "$key" in
         status) status="$value" ;; required) required="$value" ;; duration) duration="$value" ;;
-        critical) critical="$value" ;; high) high="$value" ;;
+        high) high="$value" ;; low) low="$value" ;;
         medium)
-          printf -v line '%s status=%s required=%s duration=%s critical=%s high=%s medium=%s\n' \
-            "$node" "$status" "$required" "$duration" "$critical" "$high" "$value"
+          printf -v line '%s status=%s required=%s duration=%s high=%s medium=%s low=%s\n' \
+            "$node" "$status" "$required" "$duration" "$high" "$value" "$low"
           details+="$line" ;;
       esac
     fi
@@ -113,7 +113,7 @@ require_uint() {   # <名称> <值>
 # 触发 set -e 直接杀掉脚本；拆成两次则第二次失败可以用 || true 吞掉。
 # 取参一律 "${2:-}"：同样是为了躲开 set -u 在未绑定参数上的中止。
 parse_flags() {   # <...args>
-  PARAM_count=""; PARAM_reasonable=""; PARAM_critical=""; PARAM_high=""
+  PARAM_count=""; PARAM_reasonable=""; PARAM_low=""; PARAM_high=""
   PARAM_medium=""; PARAM_files=""; PARAM_line=""; PARAM_branch=""
   PARAM_line_set=false; PARAM_branch_set=false
   PARAM_profile=""; PARAM_kv=""
@@ -121,7 +121,7 @@ parse_flags() {   # <...args>
     case "$1" in
       --count)      PARAM_count="${2:-}";      shift; shift 2>/dev/null || true ;;
       --reasonable) PARAM_reasonable="${2:-}"; shift; shift 2>/dev/null || true ;;
-      --critical)   PARAM_critical="${2:-}";   shift; shift 2>/dev/null || true ;;
+      --low)        PARAM_low="${2:-}";   shift; shift 2>/dev/null || true ;;
       --high)       PARAM_high="${2:-}";       shift; shift 2>/dev/null || true ;;
       --medium)     PARAM_medium="${2:-}";     shift; shift 2>/dev/null || true ;;
       --files)      PARAM_files="${2:-}";      shift; shift 2>/dev/null || true ;;
@@ -166,13 +166,13 @@ case "$CMD" in
     slug="${1:-}"; shift || true
     [ -n "$slug" ] || { echo "错误: 缺少 slug" >&2; usage >&2; exit 1; }
     parse_flags "$@" || die "security: 未知选项"
-    require_uint "--critical" "${PARAM_critical:-0}"
+    require_uint "--low"      "${PARAM_low:-0}"
     require_uint "--high"     "${PARAM_high:-0}"
     require_uint "--medium"   "${PARAM_medium:-0}"
-    append_event "$slug" "-" "-" "metric:security" critical "${PARAM_critical:-0}"
+    append_event "$slug" "-" "-" "metric:security" low      "${PARAM_low:-0}"
     append_event "$slug" "-" "-" "metric:security" high     "${PARAM_high:-0}"
     append_event "$slug" "-" "-" "metric:security" medium   "${PARAM_medium:-0}"
-    echo "已记录 security: critical=${PARAM_critical:-0} high=${PARAM_high:-0} medium=${PARAM_medium:-0}"
+    echo "已记录 security: high=${PARAM_high:-0} medium=${PARAM_medium:-0} low=${PARAM_low:-0}"
     ;;
 
   lessons)
@@ -217,7 +217,7 @@ case "$CMD" in
       review_report "$slug" --check-report
       sync_review_results "$slug"
       collect_metrics "$slug"
-      [ "$CM_RECONCILE_PENDING" -eq 0 ] || die "code-review 仍有未处置的 critical/high"
+      [ "$CM_RECONCILE_PENDING" -eq 0 ] || die "code-review 仍有未处置的 high"
       [ "$CM_PROBE_REQUIRED_FAILED" -eq 0 ] || die "required 探针为 failed/error"
       [ "$CM_COVERAGE_PASS" != false ] || die "增量行覆盖率低于基线"
     fi

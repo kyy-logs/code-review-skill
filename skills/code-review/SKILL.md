@@ -15,8 +15,7 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
   或直接用实际绝对路径替换；不要假定不同 shell 调用会保留变量。
 - 脚本需要 Bash、Git、awk、grep、sed 等基础命令。通过 `bash` 调用，无需依赖可执行位。
 - 报告解析需要 Python 3.9+ 和 PyYAML；默认调用 `python`，可用 `CODE_REVIEW_PYTHON` 指定解释器绝对路径。
-- 独立 reviewer 的完整说明在 `references/reviewer.md`。`.claude/agents/reviewer.md`
-  是本项目的 Claude Code 适配配置，复制 skill 到其他宿主时由宿主提供独立上下文能力。
+- 独立 reviewer 的完整说明在 `references/reviewer.md`。Claude Code 的 reviewer 适配需单独安装到被审项目的 `.claude/agents/reviewer.md`，安装方式见发布仓库 README；其他宿主须提供独立上下文能力。
 
 ## 适用范围
 
@@ -108,7 +107,7 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
    ```bash
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug}
    ```
-   没有 critical/high 也须执行，显式记录零结果；格式错误须修正，不能用旧计数或手填数字代替。
+   没有 high 也须执行，显式记录零结果；格式错误须修正，不能用旧计数或手填数字代替。
    有未处置问题（`RECONCILE_PENDING > 0`）时，本轮仍交付报告并列明阻塞项，不得推进合入。
    后续修复任务完成后，再复审受影响的部分；重派上限见 `references/probes.yaml` 的 `execution.max_retry`。
 
@@ -129,12 +128,12 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
 | 阻塞条件 | 后续动作 |
 |---|---|
 | required 探针为 `failed` / `error`（`PROBE_REQUIRED_FAILED > 0`） | 处理已发现的问题或执行错误后，重跑对应探针 |
-| critical/high finding 未完成 reconciliation（`RECONCILE_PENDING > 0`） | 按步骤 5 处理，修复后重派受影响的探针 |
-| reconcile 从未上报（`RECONCILE_REPORTED=0`） | 完成步骤 5；没有 critical/high 也须执行最终同步 |
-| `reviewer.policy=strict` 且 decision=`skip`，同时存在 open 的 critical/high | 按步骤 4 处理，未处置的 finding 不得放行 |
+| high finding 未完成 reconciliation（`RECONCILE_PENDING > 0`） | 按步骤 5 处理，修复后重派受影响的探针 |
+| reconcile 从未上报（`RECONCILE_REPORTED=0`） | 完成步骤 5；没有 high 也须执行最终同步 |
+| `reviewer.policy=strict` 且 decision=`skip`，同时存在 open 的 high | 按步骤 4 处理，未处置的 finding 不得放行 |
 | 提供了覆盖率数据且低于基线（默认增量行覆盖率 < 85%） | 列明覆盖缺口，补测试后重新审查 |
 | 提供了验收标准且未全过，或标准本身有歧义 | 列明未通过项；有歧义先澄清，不得自行勾验通过 |
-| 有 critical/high finding 停在 `wontfix` | 按输出契约完成处置，不能用“不修”冲抵待办 |
+| 有 high finding 停在 `wontfix` | 按输出契约完成处置，不能用“不修”冲抵待办 |
 
 执行状态与输入错误的判定见 `references/output-schema.md` 第 4 节。
 

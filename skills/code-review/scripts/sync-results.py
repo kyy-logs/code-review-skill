@@ -15,7 +15,7 @@ import tempfile
 import yaml
 
 
-SEVERITIES = ('critical', 'high', 'medium', 'low')
+SEVERITIES = ('high', 'medium', 'low')
 STATUSES = ('open', 'reconciled', 'wontfix', 'false-positive')
 VERDICTS = ('confirmed', 'downgraded', 'rejected', 'escalated', 'unverified')
 NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*\Z')
@@ -116,10 +116,10 @@ def read_probes(directory, configuration):
             require(item['id'] not in findings, f"重复 finding ID: {item['id']}")
             findings[item['id']] = item
             counts[item['severity']] += 1
-            open_high += item['severity'] in ('critical', 'high') and item['status'] == 'open'
+            open_high += item['severity'] == 'high' and item['status'] == 'open'
         require(block['status'] != 'skipped' or not block['findings'], f'{name}: skipped 不能带 finding')
-        require(block['status'] != 'passed' or not open_high, f'{name}: passed 与 open critical/high 矛盾')
-        require(block['status'] != 'failed' or open_high, f'{name}: failed 缺少 open critical/high')
+        require(block['status'] != 'passed' or not open_high, f'{name}: passed 与 open high 矛盾')
+        require(block['status'] != 'failed' or open_high, f'{name}: failed 缺少 open high')
         summaries.append(dict(name=name, required=required, status=block['status'], duration=duration, reason=block.get('reason', ''),
                               **{severity: counts[severity] for severity in SEVERITIES}))
     return summaries, findings
@@ -154,7 +154,8 @@ def apply_reviewer(directory, findings):
         elif kind == 'escalated':
             require(new < old, f'{identifier}: escalated 必须升级')
         else:
-            require(old == new, f'{identifier}: {kind} 不得改变 severity')
+            require(findings[identifier]['severity'] == verdict['severity'],
+                    f'{identifier}: {kind} 不得改变 severity')
         item = effective[identifier]
         item['severity'] = verdict['severity']
         if kind == 'rejected':
@@ -175,7 +176,7 @@ def summarize(directory, configuration, probes_only=False):
     final, reviewer = findings, None
     if not probes_only:
         final, reviewer = apply_reviewer(directory, findings)
-        severe = [item for item in final.values() if item['severity'] in ('critical', 'high')]
+        severe = [item for item in final.values() if item['severity'] == 'high']
         done = sum(item['status'] in ('reconciled', 'false-positive') for item in severe)
         reconciliation = dict(total=len(severe), done=done, pending=len(severe) - done)
     return dict(probes=probes, reconcile=reconciliation, original_findings=findings,
@@ -190,13 +191,13 @@ def markdown(value):
 
 
 def render_sections(summary):
-    rows = ['| 探针 | required | 状态 | 耗时（秒） | critical | high | medium | 说明 |',
+    rows = ['| 探针 | required | 状态 | 耗时（秒） | high | medium | low | 说明 |',
             '|---|---|---|---|---|---|---|---|']
     for p in summary['probes']:
         status = {'passed': '通过', 'failed': '发现阻塞问题', 'error': '执行错误', 'skipped': '跳过'}[p['status']]
         rows.append('| ' + ' | '.join(markdown(value) for value in
                     (p['name'], '是' if p['required'] else '否', status, p['duration'],
-                     p['critical'], p['high'], p['medium'], p['reason'])) + ' |')
+                     p['high'], p['medium'], p['low'], p['reason'])) + ' |')
     rows += ['', '### 问题详情（应用裁决后）', '']
     for item in summary['findings']:
         rows += [f"#### [{item['severity']}] {markdown(item['summary'])}", '',
@@ -266,7 +267,7 @@ def update_report(directory, sections, check=False):
 def events(summary):
     rows = []
     for probe in summary['probes']:
-        for key in ('status', 'required', 'duration', 'critical', 'high', 'medium'):
+        for key in ('status', 'required', 'duration', 'high', 'low', 'medium'):
             value = str(probe[key]).lower() if type(probe[key]) is bool else str(probe[key])
             rows.append('\t'.join((probe['name'], 'metric:probe', key, value)))
     if summary['reconcile'] is not None:
@@ -306,7 +307,7 @@ def main():
     elif args.events:
         print(events(summary))
     elif args.has_high:
-        print(str(any(p['critical'] or p['high'] for p in summary['probes'])).lower())
+        print(str(any(p['high'] for p in summary['probes'])).lower())
     else:
         print(json.dumps(summary, ensure_ascii=False))
     return 0

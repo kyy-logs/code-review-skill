@@ -28,7 +28,7 @@
 每条规则一个标题，后跟一行可选的 `检测模式`：
 
 ```markdown
-### SEC-001 [CRITICAL] SQL 字符串拼接
+### SEC-001 [HIGH] SQL 字符串拼接
 
 为什么这条规则重要。
 
@@ -37,7 +37,7 @@
 - `正则二`
 ```
 
-- 标题必须是 `### <规则ID> [<严重级>] <标题>`，严重级取 `CRITICAL` / `HIGH` / `MEDIUM` / `LOW`
+- 标题必须是 `### <规则ID> [<严重级>] <标题>`，严重级取 `HIGH` / `MEDIUM` / `LOW`
 - `检测模式` 里的反引号片段会被 `bash "$CODE_REVIEW_SKILL_DIR/scripts/rule-grep"` 抽出来当正则跑
 - 没有 `检测模式` 的规则不参与正则扫描
 - **规则 ID 是 finding 的 evidence**，没有 ID 的判断不算数

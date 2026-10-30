@@ -87,7 +87,7 @@ _changed_files() {
   git -C "$ROOT" -c core.quotePath=false ls-files --others --exclude-standard 2>/dev/null || true
 }
 
-# 0 = 没有 critical/high；1 = 有；2 = 判断不了（没有探针报告）
+# 0 = 没有 high；1 = 有；2 = 判断不了（没有探针报告）
 _no_high_findings() {
   local result
   result="$("${CODE_REVIEW_PYTHON:-python}" -X utf8 "$SKILL_DIR/scripts/sync-results.py" \
@@ -116,7 +116,7 @@ case "$MODE" in
   always)
     decision="run" ;;
   auto)
-    # 已有 critical/high 时不得跳过：跳过只适用于「没有东西要裁」
+    # 已有 high 时不得跳过：跳过只适用于「没有东西要裁」
     if _no_high_findings; then
       nf=0
     else

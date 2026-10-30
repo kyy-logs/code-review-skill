@@ -9,7 +9,7 @@ finding 是一条具体问题；`severity` 表示严重程度，finding 的 `sta
 |---|---|---|---|
 | `id` | 必填 | `<probe>-<序号>`；reviewer 新问题用 `R<序号>` | 全局唯一，序号从 1 开始，**必须稳定** |
 | `probe` | 必填 | 探针名；reviewer 新问题为 `reviewer` | 探针名取自 `references/probes.yaml` |
-| `severity` | 必填 | `critical` / `high` / `medium` / `low` | 见下方判定表 |
+| `severity` | 必填 | `high` / `medium` / `low` | 见下方判定表 |
 | `status` | 必填 | `open` / `reconciled` / `wontfix` / `false-positive` | 见下方状态机 |
 | `location` | 必填 | `path:line` | 定位不到行时写到文件级，并说明原因 |
 | `summary` | 必填 | 一句话 | 说**是什么问题**，不是「建议优化」这类空话 |
@@ -47,16 +47,18 @@ finding 是一条具体问题；`severity` 表示严重程度，finding 的 `sta
 
 | 级别 | 判据 | 是否进 reconciliation |
 |---|---|---|
-| `critical` | 安全 CRITICAL 规则违规 / 资金或数据正确性问题 | **是** |
-| `high` | 规范 HIGH 规则违规 / 契约破坏 / 已测量的 diff 行覆盖率低于 85% / 验收项不通过 | **是** |
+| `high` | 严重安全规则违规 / 资金或数据正确性问题 / 规范 HIGH 规则违规 / 契约破坏 / 已测量的 diff 行覆盖率低于 85% / 验收项不通过 | **是** |
 | `medium` | 可维护性问题、缺测试 | 否（记录即可） |
 | `low` | 风格、命名 | 否 |
+
+只接受上述三档；其他级别报错，不自动转换或改写历史记录。
+
 
 ### 行为类问题
 
 **1. 核对依据**
 
-以违反方法契约为由报 `critical/high`，`evidence` 必须包含实际方法的完整签名、对应接口声明（无接口则方法声明）的文件及行号、契约原文短摘。同名重载或相似接口不能代替。
+以违反方法契约为由报 `high`，`evidence` 必须包含实际方法的完整签名、对应接口声明（无接口则方法声明）的文件及行号、契约原文短摘。同名重载或相似接口不能代替。
 确认无文字契约时，可引用具体代码不变量或测试及位置；不能把未读取视为不存在。
 依据未核对或未列出时，最高 `medium`，注明“契约未核对”。
 
@@ -91,7 +93,7 @@ open ──┬─→ reconciled      已处理（改了代码 / 补了测试）
 
 ### 处置后的重跑
 
-critical/high finding 处置后，重新执行对应探针并上报结果，不得直接手工改为 `passed`。
+high finding 处置后，重新执行对应探针并上报结果，不得直接手工改为 `passed`。
 重跑须说明代码或判断依据的变化；执行状态以最新结果为准，历史 finding 及处理记录保留。
 
 ## 4. 探针执行结果
@@ -101,13 +103,13 @@ critical/high finding 处置后，重新执行对应探针并上报结果，不�
 
 | 状态 | 含义 |
 |---|---|
-| `passed` | 相关检查已完成，且无执行错误、无 open critical/high |
-| `failed` | 相关检查已完成，无执行错误但发现 open critical/high |
+| `passed` | 相关检查已完成，且无执行错误、无 open high |
+| `failed` | 相关检查已完成，无执行错误但发现 open high |
 | `skipped` | **按探针约定正常跳过**，例如本轮未提供 `requires` 所需的可选输入；必须写明原因。**不算失败** |
 | `error` | 已指定输入的路径不存在、无法读取或解析，或命令 / 工具执行失败。仅 `required=true` 时，与 `failed` 一样计入 `PROBE_REQUIRED_FAILED` |
 
 `required` 只控制该探针的 `failed/error` 执行状态是否直接阻塞，不改变 finding 的闭环要求。
-任意探针的 critical/high finding 都进入 reconciliation，未闭环仍阻塞合入。
+任意探针的 high finding 都进入 reconciliation，未闭环仍阻塞合入。
 
 已指定的覆盖率报告路径读不到时，应记为 `error`。
 默认配置指向的资源缺失或损坏同样属于 `error`，不得伪装成正常跳过。
@@ -155,11 +157,11 @@ reviewer 新问题只写入 `reviewer.json` 的 `findings`，字段同上表；�
 
 ### reconciliation 计数
 
-脚本按 ID 应用裁决并加入 reviewer 新问题后计算；只有最终 critical/high finding 进入 reconciliation。
+脚本按 ID 应用裁决并加入 reviewer 新问题后计算；只有最终 high finding 进入 reconciliation。
 medium/low 记入报告，不计入 `RECONCILE_TOTAL`。探针原始计数不受合法降级或驳回影响。
 
 ```
-RECONCILE_TOTAL   = critical + high 的 finding 总数
+RECONCILE_TOTAL   = high 的 finding 总数
 RECONCILE_DONE    = 其中 status ∈ {reconciled, false-positive} 的条数
 RECONCILE_PENDING = TOTAL - DONE      # > 0 即阻塞合入
 ```

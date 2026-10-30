@@ -75,6 +75,7 @@ _extract() {
         n = split($0, a, " ")
         id = a[2]
         if (match($0, /\[[A-Z]+\]/)) sev = substr($0, RSTART + 1, RLENGTH - 2)
+        if (sev != "" && sev != "HIGH" && sev != "MEDIUM" && sev != "LOW") exit 2
         # 标题 = [严重级] 之后的全部
         if (match($0, /\] /)) title = substr($0, RSTART + 2)
         inpat = 0
@@ -103,7 +104,7 @@ _extract() {
           line = substr(line, RSTART + RLENGTH)
         }
       }
-    ' "$f"
+    ' "$f" || return 1
   done
 }
 
@@ -115,7 +116,7 @@ _title_of() {
                       if (cur == want) { print t; exit } }' "$STD"/*.md 2>/dev/null
 }
 
-PATTERNS="$(_extract)"
+PATTERNS="$(_extract)" || { echo "错误: 规则严重级别仅支持 HIGH / MEDIUM / LOW" >&2; exit 1; }
 
 if [ "$LIST_ONLY" -eq 1 ]; then
   printf '%s\n' "$PATTERNS" | while IFS=$'\t' read -r src id sev pat; do

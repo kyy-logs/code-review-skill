@@ -5,7 +5,7 @@
 
 ## 安全
 
-### SEC-001 [CRITICAL] SQL 字符串拼接
+### SEC-001 [HIGH] SQL 字符串拼接
 
 SQL 必须使用参数绑定，禁止把用户输入拼进语句。
 
@@ -14,14 +14,14 @@ SQL 必须使用参数绑定，禁止把用户输入拼进语句。
 - `create(Query|NativeQuery)\s*\(\s*["'][^"']*["']\s*\+`
 - `["'][^"']*(SELECT|INSERT|UPDATE|DELETE)[^"']*["']\s*\+`
 
-### SEC-002 [CRITICAL] 硬编码凭证
+### SEC-002 [HIGH] 硬编码凭证
 
 密码、密钥、Token 不得写在源码里。
 
 **检测模式**:
 - `(password|passwd|secret|token|apiKey|accessKey|privateKey)\s*=\s*"[^"]{6,}"`
 
-### SEC-003 [CRITICAL] XSS 危险渲染
+### SEC-003 [HIGH] XSS 危险渲染
 
 禁止把不可信内容直接交给 HTML 渲染。
 
@@ -35,7 +35,7 @@ SQL 必须使用参数绑定，禁止把用户输入拼进语句。
 **检测模式**:
 - `Runtime\.getRuntime\(\)\.exec\s*\(|new\s+ProcessBuilder\s*\(`
 
-### AUTH-001 [CRITICAL] 越权查询
+### AUTH-001 [HIGH] 越权查询
 
 按业务 ID 查询用户数据时，必须同时带上当前用户或租户条件。
 

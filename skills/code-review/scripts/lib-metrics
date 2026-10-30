@@ -99,7 +99,7 @@ scorecard_of() { printf '%s\n' "$1/quality-scorecard.txt"; }
 require_events() {   # <slug>
   local slug="${1:-}"
   [ -s "$WF_EVENTS" ] || die "事件日志为空或不存在: $WF_EVENTS
-       需要先由各节点的 collect-metrics 埋点写入（见 .claude/skills/ 的 metrics 埋点）。"
+       需要先由各节点的 collect-metrics 埋点写入（见 skill 内 scripts/collect-metrics）。"
   _slug_has_metrics "$slug" || die "slug '$slug' 没有任何指标事件，拒绝生成 scorecard。
        请先跑该 slug 的埋点：gate-pass / deviation / security / lessons / coverage。
        （若只想补录，可先跑各项埋点再 archive。）"
@@ -173,13 +173,13 @@ profile_nodes() {   # <profile> → 节点总数
 # 所以这套权重是本工具自定义的首版默认值（见 spec §13 开放问题 1）。
 #
 # 输出两行：score 然后 grade。调用方用 read 接。
-compute_score() {   # <critical> <high> <medium> <unreasonable> <coverage_line> <coverage_measured> <lessons_count> <deviation_count> <probe_required_failed> <reconcile_pending>
-  local critical="$1" high="$2" medium="$3" unreasonable="$4"
-  local line="$5" measured="$6" lessons="$7" devcount="$8"
-  local probefail="${9:-0}" recpending="${10:-0}"
+compute_score() {   # <high> <medium> <unreasonable> <coverage_line> <coverage_measured> <lessons_count> <deviation_count> <probe_required_failed> <reconcile_pending>
+  local high="$1" medium="$2" unreasonable="$3"
+  local line="$4" measured="$5" lessons="$6" devcount="$7"
+  local probefail="${8:-0}" recpending="${9:-0}"
 
   local score=100
-  score=$(( score - critical * 15 - high * 10 - medium * 1 ))
+  score=$(( score - high * 10 - medium * 1 ))
   score=$(( score - unreasonable * 5 ))
 
   # 覆盖率只在「确实测了」时才参与扣分。未测量不扣 ——
@@ -191,17 +191,17 @@ compute_score() {   # <critical> <high> <medium> <unreasonable> <coverage_line> 
   # lessons 扣分必须条件化：code-review/SKILL.md 的 HARD-GATE 里那条门禁是
   # 「**有踩坑但** lessons 未写入」。纯文档改动、无偏离无安全问题时
   # 不写 lessons 是正常的，不该扣。
-  if [ "$lessons" -eq 0 ] && { [ "$devcount" -gt 0 ] || [ $(( critical + high )) -gt 0 ]; }; then
+  if [ "$lessons" -eq 0 ] && { [ "$devcount" -gt 0 ] || [ "$high" -gt 0 ]; }; then
     score=$(( score - 5 ))
   fi
 
   [ "$score" -lt 0 ] && score=0
 
   local grade
-  if [ "$critical" -gt 0 ] || [ "$unreasonable" -gt 0 ] \
+  if [ "$unreasonable" -gt 0 ] \
      || [ "$probefail" -gt 0 ] || [ "$recpending" -gt 0 ]; then
-    # 与 code-review 的 HARD-GATE 一致：CRITICAL 违规、不合理偏离、required
-    # 探针未通过、critical/high finding 未完成 reconciliation —— 这四件事本就阻塞
+    # 与 HARD-GATE 一致：不合理偏离、required 探针未通过、
+    # high finding 未完成 reconciliation 均阻塞。
     # 合入，评分不该给出及格。
     # 后两条来自文档 §11.3：code-review 的 gate 是「required probe、
     # reconciliation、验收、lessons」。
@@ -306,7 +306,7 @@ _metrics_snapshot() {   # <slug>
         rb++
       } else if (ev == "metric:probe") {
         # 探针明细按 **node（=探针名）+ key** 取最后一次。复合键里必须带 node：
-        # 各探针独立上报 critical/high，若共用 metric:probe:critical 这一个键，
+        # 各探针独立上报 high，若共用 metric:probe:low 这一个键，
         # 后写的会盖掉先写的，聚合出来只剩最后一个探针的数字 —— 少算且不报错。
         k = node ":" key
         if (ep >= p_ep[k]) { p_ep[k] = ep; p[k] = val }
@@ -334,8 +334,8 @@ _metrics_snapshot() {   # <slug>
           if (p[k] == "failed" || p[k] == "error") p_bad[pn] = 1
         } else if (pk == "required") {
           if (p[k] == "true") p_req[pn] = 1
-        } else if (pk == "critical") {
-          p_crit += p[k] + 0
+        } else if (pk == "low") {
+          p_low += p[k] + 0
         } else if (pk == "high") {
           p_high += p[k] + 0
         }
@@ -357,14 +357,14 @@ _metrics_snapshot() {   # <slug>
       printf "metric:coverage:branch\t%s\n",     m["metric:coverage:branch"]
       printf "metric:deviation:count\t%s\n",     m["metric:deviation:count"]
       printf "metric:deviation:reasonable\t%s\n", m["metric:deviation:reasonable"]
-      printf "metric:security:critical\t%s\n",   m["metric:security:critical"]
+      printf "metric:security:low\t%s\n",   m["metric:security:low"]
       printf "metric:security:high\t%s\n",       m["metric:security:high"]
       printf "metric:security:medium\t%s\n",     m["metric:security:medium"]
       printf "metric:lessons:count\t%s\n",       m["metric:lessons:count"]
       printf "metric:lessons:files\t%s\n",       m["metric:lessons:files"]
       printf "probe:total\t%d\n",               p_total + 0
       printf "probe:required_failed\t%d\n",     p_reqfail + 0
-      printf "probe:findings_critical\t%d\n",   p_crit + 0
+      printf "probe:findings_low\t%d\n",   p_low + 0
       printf "probe:findings_high\t%d\n",       p_high + 0
       printf "metric:reconcile:total\t%s\n",     m["metric:reconcile:total"]
       printf "metric:reconcile:done\t%s\n",      m["metric:reconcile:done"]
@@ -392,6 +392,12 @@ _metrics_snapshot() {   # <slug>
 #    要真正保列，得用 `read -r k v rest` 或干脆不上 `read`。
 _apply_snapshot() {   # <slug>
   local k v
+  if [ -f "$WF_EVENTS" ]; then
+    awk -F'\t' -v s="$1" '
+      $3 == s && $6 == "metric:security" && $7 !~ /^(high|medium|low)$/ { exit 1 }
+      $3 == s && $6 == "metric:probe" && $7 !~ /^(status|required|duration|high|medium|low)$/ { exit 1 }
+    ' "$WF_EVENTS" || die "指标字段不受支持，请显式迁移历史记录"
+  fi
   while IFS="$(printf '\t')" read -r k v; do
     case "$k" in
       profile)                      CM_PROFILE="${v:-unknown}" ;;
@@ -404,14 +410,14 @@ _apply_snapshot() {   # <slug>
       metric:coverage:branch)       CM_COVERAGE_BRANCH="$v" ;;
       metric:deviation:count)       CM_DEVIATION_COUNT="${v:-0}" ;;
       metric:deviation:reasonable)  CM_DEVIATION_REASONABLE="${v:-0}" ;;
-      metric:security:critical)     CM_SECURITY_CRITICAL="${v:-0}" ;;
+      metric:security:low)     CM_SECURITY_LOW="${v:-0}" ;;
       metric:security:high)         CM_SECURITY_HIGH="${v:-0}" ;;
       metric:security:medium)       CM_SECURITY_MEDIUM="${v:-0}" ;;
       metric:lessons:count)         CM_LESSONS_WRITTEN="${v:-0}" ;;
       metric:lessons:files)         CM_LESSONS_FILES="$v" ;;
       probe:total)                  CM_PROBE_TOTAL="${v:-0}" ;;
       probe:required_failed)        CM_PROBE_REQUIRED_FAILED="${v:-0}" ;;
-      probe:findings_critical)      CM_PROBE_FINDINGS_CRITICAL="${v:-0}" ;;
+      probe:findings_low)      CM_PROBE_FINDINGS_LOW="${v:-0}" ;;
       probe:findings_high)          CM_PROBE_FINDINGS_HIGH="${v:-0}" ;;
       metric:reconcile:total)       CM_RECONCILE_TOTAL="${v:-0}" ;;
       metric:reconcile:done)        CM_RECONCILE_DONE="${v:-0}" ;;
@@ -426,14 +432,14 @@ _apply_snapshot() {   # <slug>
   CM_COVERAGE_BRANCH="${CM_COVERAGE_BRANCH:-}"
   CM_DEVIATION_COUNT="${CM_DEVIATION_COUNT:-0}"
   CM_DEVIATION_REASONABLE="${CM_DEVIATION_REASONABLE:-0}"
-  CM_SECURITY_CRITICAL="${CM_SECURITY_CRITICAL:-0}"
+  CM_SECURITY_LOW="${CM_SECURITY_LOW:-0}"
   CM_SECURITY_HIGH="${CM_SECURITY_HIGH:-0}"
   CM_SECURITY_MEDIUM="${CM_SECURITY_MEDIUM:-0}"
   CM_LESSONS_WRITTEN="${CM_LESSONS_WRITTEN:-0}"
   CM_LESSONS_FILES="${CM_LESSONS_FILES:-}"
   CM_PROBE_TOTAL="${CM_PROBE_TOTAL:-0}"
   CM_PROBE_REQUIRED_FAILED="${CM_PROBE_REQUIRED_FAILED:-0}"
-  CM_PROBE_FINDINGS_CRITICAL="${CM_PROBE_FINDINGS_CRITICAL:-0}"
+  CM_PROBE_FINDINGS_LOW="${CM_PROBE_FINDINGS_LOW:-0}"
   CM_PROBE_FINDINGS_HIGH="${CM_PROBE_FINDINGS_HIGH:-0}"
   CM_RECONCILE_TOTAL="${CM_RECONCILE_TOTAL:-0}"
   CM_RECONCILE_DONE="${CM_RECONCILE_DONE:-0}"
@@ -562,7 +568,7 @@ collect_metrics() {   # <slug>
   CM_DEVIATION_UNREASONABLE=$(( CM_DEVIATION_COUNT - CM_DEVIATION_REASONABLE ))
   [ "$CM_DEVIATION_UNREASONABLE" -lt 0 ] && CM_DEVIATION_UNREASONABLE=0
 
-  # reconciliation 的待办数 = critical/high finding 总数 - 已逐项处理数。
+  # reconciliation 的待办数 = high finding 总数 - 已逐项处理数。
   # 与 DEVIATION_UNREASONABLE 同样防负数：命令侧已挡了 done>total，这里是
   # 事件日志被手工改过时的第二道。
   [ "$CM_RECONCILE_TOTAL" -ge 0 ] 2>/dev/null || CM_RECONCILE_TOTAL=0
@@ -579,7 +585,7 @@ collect_metrics() {   # <slug>
   CM_WALL_TIME_MINUTES=0
 
   local scored
-  scored="$(compute_score "$CM_SECURITY_CRITICAL" "$CM_SECURITY_HIGH" "$CM_SECURITY_MEDIUM" \
+  scored="$(compute_score "$CM_SECURITY_HIGH" "$CM_SECURITY_MEDIUM" \
                           "$CM_DEVIATION_UNREASONABLE" "$CM_COVERAGE_LINE" "$CM_COVERAGE_MEASURED" \
                           "$CM_LESSONS_WRITTEN" "$CM_DEVIATION_COUNT" \
                           "$CM_PROBE_REQUIRED_FAILED" "$CM_RECONCILE_PENDING")"
@@ -617,14 +623,14 @@ render_scorecard() {
   _qv _q_DEVIATION_COUNT "$CM_DEVIATION_COUNT"
   _qv _q_DEVIATION_REASONABLE "$CM_DEVIATION_REASONABLE"
   _qv _q_DEVIATION_UNREASONABLE "$CM_DEVIATION_UNREASONABLE"
-  _qv _q_SECURITY_CRITICAL "$CM_SECURITY_CRITICAL"
+  _qv _q_SECURITY_LOW "$CM_SECURITY_LOW"
   _qv _q_SECURITY_HIGH "$CM_SECURITY_HIGH"
   _qv _q_SECURITY_MEDIUM "$CM_SECURITY_MEDIUM"
   _qv _q_LESSONS_WRITTEN "$CM_LESSONS_WRITTEN"
   _qv _q_LESSONS_FILES "$CM_LESSONS_FILES"
   _qv _q_PROBE_TOTAL "$CM_PROBE_TOTAL"
   _qv _q_PROBE_REQUIRED_FAILED "$CM_PROBE_REQUIRED_FAILED"
-  _qv _q_PROBE_FINDINGS_CRITICAL "$CM_PROBE_FINDINGS_CRITICAL"
+  _qv _q_PROBE_FINDINGS_LOW "$CM_PROBE_FINDINGS_LOW"
   _qv _q_PROBE_FINDINGS_HIGH "$CM_PROBE_FINDINGS_HIGH"
   _qv _q_RECONCILE_PENDING "$CM_RECONCILE_PENDING"
   _qv _q_RECONCILE_REPORTED "$CM_RECONCILE_REPORTED"
@@ -659,7 +665,7 @@ render_scorecard() {
 #     探针 —— **skipped 不算失败**
 #   - sync 按注册表校验报告是否齐全并读取 required；缺失报告不能按零问题通过。
 #     结构校验不证明 AI 实际完成了检查，也不证明 finding 的语义判断正确。
-#   - RECONCILE_PENDING = critical/high finding 总数 - 已逐项处理数。> 0 即卡门禁
+#   - RECONCILE_PENDING = high finding 总数 - 已逐项处理数。> 0 即卡门禁
 #   - RECONCILE_REPORTED = 1|0，**本批报告是否已最终同步**，与 PENDING 的 0 不是一回事：
 #     total/done 取不到时兜底是 0，那会把「从没跑过」伪装成「核过了、没有待办」
 
@@ -687,8 +693,8 @@ DEVIATION_COUNT=$_q_DEVIATION_COUNT
 DEVIATION_REASONABLE=$_q_DEVIATION_REASONABLE
 DEVIATION_UNREASONABLE=$_q_DEVIATION_UNREASONABLE
 
-# 安全指标
-SECURITY_CRITICAL=$_q_SECURITY_CRITICAL
+# 安全指标（high / medium / low）
+SECURITY_LOW=$_q_SECURITY_LOW
 SECURITY_HIGH=$_q_SECURITY_HIGH
 SECURITY_MEDIUM=$_q_SECURITY_MEDIUM
 
@@ -696,10 +702,10 @@ SECURITY_MEDIUM=$_q_SECURITY_MEDIUM
 LESSONS_WRITTEN=$_q_LESSONS_WRITTEN
 LESSONS_FILES=$_q_LESSONS_FILES
 
-# 探针指标（code-review v2；逐探针明细见同目录 probes/）
+# 探针指标（逐探针明细见同目录 probes/）
 PROBE_TOTAL=$_q_PROBE_TOTAL
 PROBE_REQUIRED_FAILED=$_q_PROBE_REQUIRED_FAILED
-PROBE_FINDINGS_CRITICAL=$_q_PROBE_FINDINGS_CRITICAL
+PROBE_FINDINGS_LOW=$_q_PROBE_FINDINGS_LOW
 PROBE_FINDINGS_HIGH=$_q_PROBE_FINDINGS_HIGH
 RECONCILE_PENDING=$_q_RECONCILE_PENDING
 # 0 = 从没上报过 reconcile（步骤 4/5 没走完）。与 PENDING=0 的含义正相反：
@@ -737,11 +743,16 @@ write_scorecard_atomic() {   # <slug_dir>
 trend_upsert() {
   local tmp line
   mkdir -p "$WF_WORK"
-  line="$CM_SLUG,$CM_PROFILE,$CM_GENERATED_AT,$CM_QUALITY_SCORE,$CM_QUALITY_GRADE,$CM_COVERAGE_LINE,$CM_DEVIATION_COUNT,$CM_SECURITY_CRITICAL,$CM_LESSONS_WRITTEN,$CM_WALL_TIME_MINUTES"
+  local header="slug,profile,generated_at,score,grade,coverage_line,deviation,security_low,lessons,wall_time"
+  if [ -s "$WF_TREND" ]; then
+    [ "$(head -n 1 "$WF_TREND" | tr -d '\r')" = "$header" ] \
+      || die "趋势字段不受支持，请显式迁移历史文件"
+  fi
+  line="$CM_SLUG,$CM_PROFILE,$CM_GENERATED_AT,$CM_QUALITY_SCORE,$CM_QUALITY_GRADE,$CM_COVERAGE_LINE,$CM_DEVIATION_COUNT,$CM_SECURITY_LOW,$CM_LESSONS_WRITTEN,$CM_WALL_TIME_MINUTES"
 
   if [ ! -s "$WF_TREND" ]; then
     # lessons 文件列表不进 CSV：它含空格，将来有人加逗号列就会破格式。
-    printf '%s\n' "slug,profile,generated_at,score,grade,coverage_line,deviation,security_critical,lessons,wall_time" > "$WF_TREND"
+    printf '%s\n' "$header" > "$WF_TREND"
   fi
 
   tmp="$(mktemp "$WF_WORK/quality-trend.csv.XXXXXX")"

@@ -8,8 +8,8 @@ execution:
   max_retry: 1              # reconciliation 发现遗漏时重派的次数上限
 
 # scripts/review-mode 判断是否派发：always 总派，never 不派，auto 按 skip_when 决定。
-# no_findings 指无 critical/high；only_docs 指改动全为 .md / .rst / .txt。
-# strict 在跳过且仍有 open critical/high 时阻塞；advisory 只告警。
+# no_findings 指无 high；only_docs 指改动全为 .md / .rst / .txt。
+# strict 在跳过且仍有 open high 时阻塞；advisory 只告警。
 
 reviewer:
   mode: auto
