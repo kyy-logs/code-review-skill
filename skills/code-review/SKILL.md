@@ -15,7 +15,11 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
   或直接用实际绝对路径替换；不要假定不同 shell 调用会保留变量。
 - 脚本需要 Bash、Git、awk、grep、sed 等基础命令。通过 `bash` 调用，无需依赖可执行位。
 - 报告解析需要 Python 3.9+ 和 PyYAML；默认调用 `python`，可用 `CODE_REVIEW_PYTHON` 指定解释器绝对路径。
-- 独立 reviewer 的完整说明在 `references/reviewer.md`。Claude Code 的 reviewer 适配需单独安装到被审项目的 `.claude/agents/reviewer.md`，安装方式见发布仓库 README；其他宿主须提供独立上下文能力。
+- 独立 reviewer 的完整说明在 `references/reviewer.md`。安装与派发按宿主：
+  - Claude Code：skill 在 `.claude/skills/code-review/`，适配器在 `.claude/agents/reviewer.md`，派发 `subagent_type: reviewer`。
+  - Codex：skill 在 `.agents/skills/code-review/`，适配器在 `.codex/agents/reviewer.toml`，以自定义 agent `reviewer` 派发（`agent_type: reviewer`）。
+  - 其他宿主：须提供独立上下文能力；无法提供时记录限制，不得伪造裁决。
+  安装方式见发布仓库 README；仓库内入口为 `scripts/install.py`。
 
 ## 适用范围
 
@@ -93,7 +97,10 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
    ```bash
    DECISION="$(bash "$CODE_REVIEW_SKILL_DIR/scripts/review-mode" {slug} --base <base>)"
    ```
-   - `run` → 用宿主的独立上下文工具派发 reviewer（Claude Code：`subagent_type: reviewer`），执行 `references/reviewer.md`。
+   - `run` → 用宿主的独立上下文工具派发 reviewer，执行 `references/reviewer.md`：
+     - Claude Code：`subagent_type: reviewer`（`.claude/agents/reviewer.md`）。
+     - Codex：自定义 agent `reviewer`（`.codex/agents/reviewer.toml`，`agent_type: reviewer`）。
+     - 其他宿主：按宿主机制提供独立上下文；无法提供时记录限制。
    - `skip reason=...` → 不派发，在产物目录的 `reviewer.json` 记录 decision、reason 和空数组。
 
    派发时提供 skill 路径、项目根、`{slug}`、产物目录、审查模式、base、目标（工作区或 head）、

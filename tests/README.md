@@ -7,8 +7,9 @@ do not replace recall or reviewer evaluation.
 Release-note tests run the NEWS-to-README synchronizer against temporary
 documents, including stale previews, invalid markers, and repeated runs.
 
-Installation checks copy `skills/code-review/` and the Claude adapter into a
-separate temporary project and exercise the copied scripts, including paths
+Installation checks cover both the Claude Code and Codex layouts, the unified
+installer, repeated installs, existing-config protection, `--dry-run`, and
+`--force` backups. They copy into a separate temporary project, including paths
 containing spaces. No skill-directory environment override is needed.
 
 Run from the repository root:

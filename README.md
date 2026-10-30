@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 **Evidence-backed code review. Static-first, probe-driven, and gated.**
 
-The skill source lives in [`skills/code-review/`](skills/code-review/), independently of any host's installation directory. A Claude Code reviewer adapter is included in [`adapters/claude-code/`](adapters/claude-code/). The current version is a beta candidate; see [VERSION](VERSION).
+The skill source lives in [`skills/code-review/`](skills/code-review/), independently of any host's installation directory. Reviewer adapters for Claude Code and Codex are included in [`adapters/`](adapters/). The current version is a beta candidate; see [VERSION](VERSION).
 
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-6B4FBB?style=flat-square)](https://claude.com/claude-code)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-standard-1f6feb?style=flat-square)](https://agentskills.io)
@@ -24,10 +24,12 @@ It never modifies the code under review.
 
 - Four review probes: behavior correctness, test coverage, repository rules,
   and impact analysis.
-- Portable skill source in `skills/code-review/`, with a separate Claude Code
-  reviewer adapter in `adapters/claude-code/`.
+- Portable skill source in `skills/code-review/`, with separate Claude Code
+  and Codex reviewer adapters in `adapters/`.
 - JSON-derived report sections and merge gates, with an optional independent
   reviewer.
+- A unified installer for `claude-code`, `codex`, or both, with dry-run,
+  conflict protection, and timestamped backups under `--force`.
 
 #### Changed
 
@@ -57,7 +59,7 @@ gate behavior may change before 1.0.
 - **Scope:** static-first review with four probes, an optional independent
   reviewer, and JSON-derived report/gate output. It does not replace tests, CI,
   or human review.
-- **Validation:** 23 offline pipeline tests; a clean-project end-to-end run with
+- **Validation:** 37 offline pipeline and installation tests; a clean-project end-to-end run with
   the reviewer and a failing gate; additional probe/reviewer smokes. These are
   regression checks, not a general recall claim. Concurrency-defect detection
   has not been validated.
@@ -94,24 +96,34 @@ gate behavior may change before 1.0.
 
 ### Install
 
-For Claude Code, copy the skill and its reviewer adapter into your project's `.claude` directory. The source repository uses `skills/`; `.claude/` is the installation destination.
-
-For this release-candidate branch:
+The repository keeps the portable skill in `skills/code-review/`; installation copies it and the matching reviewer adapter into your project. The installer does not overwrite existing files by default.
 
 ```bash
 git clone --branch feat/behavior-review-probe https://github.com/kyy-logs/code-review-skill.git
-CODE_REVIEW_SOURCE_DIR="$(pwd)/code-review-skill"
-cd /path/to/your-project
-mkdir -p .claude/skills .claude/agents
-cp -r "$CODE_REVIEW_SOURCE_DIR/skills/code-review" .claude/skills/
-cp "$CODE_REVIEW_SOURCE_DIR/adapters/claude-code/reviewer.md" .claude/agents/
+cd code-review-skill
+python scripts/install.py --agent both --project /path/to/your-project
 ```
 
-Claude Code discovers it as `code-review`.
+Or use the shell wrapper:
 
-Both copies are needed for the Claude Code workflow: installing the skill alone does not register the independent reviewer. Install the prerequisites in [Requirements](#requirements) first. If Python cannot import PyYAML, install it with `python -m pip install PyYAML` in the interpreter used by the skill; `CODE_REVIEW_PYTHON` can select another interpreter.
+```bash
+bash scripts/install --agent codex --project /path/to/your-project
+```
 
-For another host, install the same `skills/code-review/` folder into that host's skill directory and provide its own independent-context mechanism. The portable source layout does not imply that every host has been validated; only the Claude Code adapter is supplied here.
+Host layouts:
+
+| Host | Skill | Reviewer adapter | Dispatch |
+|---|---|---|---|
+| Claude Code | `.claude/skills/code-review/` | `.claude/agents/reviewer.md` | `subagent_type: reviewer` |
+| Codex | `.agents/skills/code-review/` | `.codex/agents/reviewer.toml` | custom agent `reviewer` (`agent_type: reviewer`) |
+
+`--agent` accepts `claude-code`, `codex`, or `both`. Existing files are protected: the installer exits with a conflict list; `--force` backs up the existing target before replacing it. `--dry-run` prints the plan. It never edits `.codex/config.toml` or other agents.
+
+`npx -y skills add ... --agent codex --yes` installs the skill only; it does not install the reviewer adapter. Use the installer above for the independent reviewer. Node.js 22.20+ is only needed for that optional `npx` path.
+
+For another host, install `skills/code-review/` into that host's skill directory and provide its own independent-context mechanism. Only the Claude Code and Codex adapters are supplied.
+
+Both copies are needed for the full workflow: installing the skill alone does not register the independent reviewer. If Python cannot import PyYAML, install it with `python -m pip install PyYAML` in the interpreter used by the skill; `CODE_REVIEW_PYTHON` can select another interpreter.
 
 ### Run
 
@@ -213,7 +225,7 @@ A project rule package **replaces** the built-in package; it is not merged with 
 
 ## Independent reviewer
 
-`skills/code-review/references/reviewer.md` is the host-neutral reviewer script. `adapters/claude-code/reviewer.md` is the Claude Code adapter; after installation it lives at `.claude/agents/reviewer.md` in the reviewed project.
+`skills/code-review/references/reviewer.md` is the host-neutral reviewer script. `adapters/claude-code/reviewer.md` is the Claude Code adapter (installed at `.claude/agents/reviewer.md`); `adapters/codex/reviewer.toml` is the Codex custom-agent definition (installed at `.codex/agents/reviewer.toml`). Both adapters only provide host routing and point back to the same reviewer script.
 
 The reviewer gets the frozen skill, the case inputs, and the raw probe bundle — not reference comments, expected answers, or prior reports. If the host cannot provide a fresh context, record that limitation; do not fabricate a verdict.
 
@@ -265,9 +277,10 @@ The evaluation harness and raw reports are kept out of the published repository.
 
 ## Requirements
 
-- Claude Code with Agent Skills support.
+- Claude Code with Agent Skills support, or Codex with custom-agent support.
 - Bash, Git, awk, grep, sed.
-- Python 3.9+ with PyYAML (for report parsing and metrics).
+- Python 3.9+ with PyYAML (for the installer, report parsing, and metrics).
+- Node.js 22.20+ only if you use the optional `npx skills` shortcut for a skill-only install.
 
 ## Repository layout
 
@@ -279,7 +292,10 @@ code-review-skill/
 ├── LICENSE
 ├── VERSION
 ├── .github/workflows/sync-news.yml
-├── scripts/sync-news.py
+├── scripts/
+│   ├── install
+│   ├── install.py
+│   └── sync-news.py
 ├── skills/
 │   └── code-review/
 │       ├── SKILL.md
@@ -297,7 +313,8 @@ code-review-skill/
 │           ├── rule-grep
 │           └── sync-results.py
 ├── adapters/
-│   └── claude-code/reviewer.md
+│   ├── claude-code/reviewer.md
+│   └── codex/reviewer.toml
 └── tests/
 ```
 
