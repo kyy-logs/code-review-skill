@@ -59,7 +59,7 @@ gate behavior may change before 1.0.
 - **Scope:** static-first review with four probes, an optional independent
   reviewer, and JSON-derived report/gate output. It does not replace tests, CI,
   or human review.
-- **Validation:** 37 offline pipeline and installation tests; a clean-project end-to-end run with
+- **Validation:** 43 offline pipeline and installation tests; a clean-project end-to-end run with
   the reviewer and a failing gate; additional probe/reviewer smokes. These are
   regression checks, not a general recall claim. Concurrency-defect detection
   has not been validated.
@@ -97,6 +97,18 @@ gate behavior may change before 1.0.
 ### Install
 
 The repository keeps the portable skill in `skills/code-review/`; installation copies it and the matching reviewer adapter into your project. The installer does not overwrite existing files by default.
+
+Run this command **inside your project** to install the skill and Codex reviewer together:
+
+```bash
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/feat/behavior-review-probe/scripts/install-remote.py', timeout=30).read())" --agent codex
+```
+
+Requires Python 3.9+ and Git on `PATH`; use `python3` if that is your Python command. Replace `codex` with `claude-code` or `both` to select another host. The entry downloads this feature branch into a temporary directory, runs the installer, and removes the checkout afterward. You do not need to clone or enter this repository yourself.
+
+Append `--dry-run` to preview, `--project "/path/to/your-project"` to choose another project, or `--ref <branch-or-tag>` to select a source version that includes the installer. Until this change is merged, the remote entry and its default source are on `feat/behavior-review-probe`.
+
+For a local checkout:
 
 ```bash
 git clone --branch feat/behavior-review-probe https://github.com/kyy-logs/code-review-skill.git
@@ -279,7 +291,7 @@ The evaluation harness and raw reports are kept out of the published repository.
 
 - Claude Code with Agent Skills support, or Codex with custom-agent support.
 - Bash, Git, awk, grep, sed.
-- Python 3.9+ with PyYAML (for the installer, report parsing, and metrics).
+- Python 3.9+; installation uses the standard library. PyYAML is required to run the review scripts for report parsing and metrics.
 - Node.js 22.20+ only if you use the optional `npx skills` shortcut for a skill-only install.
 
 ## Repository layout
@@ -295,6 +307,7 @@ code-review-skill/
 ├── scripts/
 │   ├── install
 │   ├── install.py
+│   ├── install-remote.py
 │   └── sync-news.py
 ├── skills/
 │   └── code-review/

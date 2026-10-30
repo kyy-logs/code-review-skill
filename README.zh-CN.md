@@ -44,7 +44,7 @@
 
 - **三级评级**：`high`、`medium`、`low`。此前四级版本写入的记录，包括包含 `critical` 值的记录，**不兼容**当前版本；`collect-metrics` 会拒绝这些记录。使用前请重新审查，或显式迁移记录。
 - **适用范围**：以静态分析为主，使用四个探针、可选的独立 reviewer，以及从 JSON 派生的报告和门禁。不能替代测试、CI 或人工审查。
-- **验证情况**：37 项审查流程与安装离线测试；干净项目中包含 reviewer 和阻塞门禁的端到端验证；额外的探针与 reviewer 冒烟验证。这些属于回归检查，不能据此宣称具备通用召回能力。并发缺陷识别尚未验证。
+- **验证情况**：43 项审查流程与安装离线测试；干净项目中包含 reviewer 和阻塞门禁的端到端验证；额外的探针与 reviewer 冒烟验证。这些属于回归检查，不能据此宣称具备通用召回能力。并发缺陷识别尚未验证。
 
 ## 目录
 
@@ -79,6 +79,18 @@
 ### 安装
 
 源码仓库把可移植技能放在 `skills/code-review/`；安装器会把技能和对应宿主的 reviewer 适配器复制到使用方项目。默认不覆盖已有文件。
+
+**在你的项目目录中**执行下面一条命令，同时安装 skill 和 Codex reviewer：
+
+```bash
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/feat/behavior-review-probe/scripts/install-remote.py', timeout=30).read())" --agent codex
+```
+
+需要 Python 3.9+ 和 PATH 中可用的 Git；如果你的 Python 命令是 `python3`，替换开头的 `python` 即可。把 `codex` 改成 `claude-code` 或 `both` 可选择其他宿主。入口会把此功能分支下载到临时目录，调用安装器，结束后清理临时仓库，无须手动克隆或切换目录。
+
+命令末尾可追加 `--dry-run` 预览、`--project "你的项目路径"` 指定其他项目，或 `--ref <分支或标签>` 选择包含安装器的源码版本。合并前，远程入口及默认下载来源均为 `feat/behavior-review-probe`。
+
+如果已经有本地源码仓库：
 
 ```bash
 git clone --branch feat/behavior-review-probe https://github.com/kyy-logs/code-review-skill.git
@@ -256,7 +268,7 @@ reviewer 读取冻结的技能、案例输入和原始探针结果，不读取�
 
 - 支持 Agent Skills 的 Claude Code，或支持自定义 agent 的 Codex。
 - Bash、Git、awk、grep、sed。
-- Python 3.9+，并安装 PyYAML，用于安装器、报告解析和指标处理。
+- Python 3.9+；安装仅使用标准库。运行审查脚本时还需要 PyYAML，用于报告解析和指标处理。
 - Node.js 22.20+ 仅在使用可选的 `npx skills` 只装技能快捷方式时需要。
 
 ## 仓库结构
@@ -272,6 +284,7 @@ code-review-skill/
 ├── scripts/
 │   ├── install
 │   ├── install.py
+│   ├── install-remote.py
 │   └── sync-news.py
 ├── skills/
 │   └── code-review/
