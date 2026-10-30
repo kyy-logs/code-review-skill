@@ -1,8 +1,19 @@
 # News
 
 User-facing changes, newest release first. Add each release under a `##`
-heading; use `###` for categories. The first release is automatically shown
-in the README. Keep internal plans and evaluation artifacts out of this file.
+heading; use `###` for categories. The latest released version (not the
+Unreleased block) is automatically shown in the README. Keep internal plans
+and evaluation artifacts out of this file.
+
+<!-- UNRELEASED:START -->
+## Unreleased
+
+### Added
+
+- Add automatic NEWS unreleased updates
+- Add one-command remote skill installation
+
+<!-- UNRELEASED:END -->
 
 ## v0.1.0-beta (2026-10-30)
 

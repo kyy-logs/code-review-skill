@@ -30,14 +30,19 @@ def markdown_headings(lines):
                 yield index, len(heading.group(1))
 
 
+def heading_text(line):
+    return re.sub(r"^#{2,6} +", "", line).strip().lower()
+
+
 def preview(news):
     lines = news.splitlines()
     headings = list(markdown_headings(lines))
     releases = [index for index, level in headings if level == 2]
-    if not releases:
-        raise ValueError("NEWS.md needs a release heading starting with '## '.")
-    start = releases[0]
-    end = releases[1] if len(releases) > 1 else len(lines)
+    released = [index for index in releases if heading_text(lines[index]) not in ("unreleased", "未发布")]
+    if not released:
+        raise ValueError("NEWS.md needs a released version heading starting with '## '.")
+    start = released[0]
+    end = next((index for index in releases if index > start), len(lines))
     if not "\n".join(lines[start + 1:end]).strip():
         raise ValueError("The latest NEWS release has no content.")
     for index, level in headings:
