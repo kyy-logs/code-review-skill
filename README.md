@@ -1,5 +1,7 @@
 # code-review-skill
 
+English | [简体中文](README.zh-CN.md)
+
 **Evidence-backed code review. Static-first, probe-driven, and gated.**
 
 The skill source lives in [`skills/code-review/`](skills/code-review/), independently of any host's installation directory. A Claude Code reviewer adapter is included in [`adapters/claude-code/`](adapters/claude-code/). The current version is a beta candidate; see [VERSION](VERSION).
@@ -116,7 +118,7 @@ For another host, install the same `skills/code-review/` folder into that host's
 Ask in Claude Code:
 
 ```text
-帮我 review 这次改动
+Review these changes with code-review.
 ```
 
 Or invoke the skill directly:
@@ -229,11 +231,33 @@ The reviewer gets the frozen skill, the case inputs, and the raw probe bundle �
 
 - Baseline: commit `494a39bb`, before `behavior-review` was extracted into a standalone probe. The snapshot validates the shared finding and gate contract, not the four-probe split itself.
 - 11/11 cases completed; reviewer off; static review.
-- Original behavior targets: 5/5 hit.
+- Original behavior targets: 5/5 hit; including two independently confirmed edge cases, 5/7 required targets were found.
 - Clean and fixed controls: 4/4 passed without false blocking.
 - Two confirmed edge-case misses remain: legal input formatting in a parser, and a JSON representation round-trip in command rendering.
 - 33 raw findings: 8 high, 20 medium, 5 low; 0 confirmed false positives, with unverified items still open.
 - The full merge gate was not run.
+
+Risk areas exercised by these cases:
+
+| Risk area | Cases | Observed result |
+|---|---|---|
+| Resource lifecycle | DBeaver | Found an input stream left open after copying; confirmed target. |
+| Execution logic | Kestra, Keycloak guides | Found duplicate interpreter/command assembly in Kestra; confirmed target. Also reported switch fall-through in Keycloak, with downstream impact only partly supported. |
+| Input boundaries and value handling | Lang-1, Spring AI Alibaba | Found hexadecimal overflow handling and blank-string sentinel problems; confirmed targets. The leading-zero return-type finding remained a contract dispute and was rated too high. |
+| Permissions and data scope | Keycloak groups (m01), Elasticsearch | Found authorization resource IDs used as group IDs; confirmed target. The non-default filesystem permission-bypass candidate still needs threat-model and exploitability evidence. |
+| API compatibility | Kestra | Identified public SPI return-type changes and new abstract methods; compatibility break supported, affected external plugins not measured. |
+| Cache and state consistency | Keycloak login cache (m02) | Reported an invalidation risk involving organization-wrapped models; runtime consequences remain unverified. |
+| Performance and repeated work | Elasticsearch, Kestra, Keycloak login cache | Reported logging overhead, repeated rendering/downloads, and extra lookups; performance impact was not benchmarked. |
+| Test quality and regression protection | DBeaver, Keycloak, Kestra | Identified missing branch tests, tests bypassing the changed production entry point, and incorrect cleanup or cache-invalidation coverage. |
+
+The two confirmed misses were Keycloak's valid `tileVisible = "false"`
+syntax bypassing validation, and Kestra's JSON render/parse round-trip
+corrupting command values containing quotes, backslashes, or newlines.
+
+The four controls checked false alarms: the Lang-1 fix, normal pagination,
+normal tag normalization, and a valid login-cache delegation path that should
+not be reported as recursion. Passing a control does not establish that its
+entire change is defect-free.
 
 The evaluation harness and raw reports are kept out of the published repository. This snapshot is a regression result, not a claim of general recall.
 
@@ -250,6 +274,7 @@ The evaluation harness and raw reports are kept out of the published repository.
 ```text
 code-review-skill/
 ├── README.md
+├── README.zh-CN.md
 ├── NEWS.md
 ├── LICENSE
 ├── VERSION
@@ -295,6 +320,8 @@ automatically. Only that preview is generated; edit the rest of this README
 normally. You can also run `python scripts/sync-news.py` locally, or add
 `--check` to detect a stale preview without changing files. Automatic commits
 use the built-in `GITHUB_TOKEN`; branch rules must allow that bot to push.
+Keep [README.zh-CN.md](README.zh-CN.md) aligned when changing this document;
+the Chinese translation, including its news summary, is maintained manually.
 
 ## License
 
