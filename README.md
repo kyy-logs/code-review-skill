@@ -13,6 +13,36 @@ Most AI reviews stop at “this looks risky.” This skill produces a review you
 
 It never modifies the code under review.
 
+## Latest news
+
+<!-- NEWS:START -->
+### v0.1.0-beta (2026-10-30)
+
+#### Added
+
+- Four review probes: behavior correctness, test coverage, repository rules,
+  and impact analysis.
+- Portable skill source in `skills/code-review/`, with a separate Claude Code
+  reviewer adapter in `adapters/claude-code/`.
+- JSON-derived report sections and merge gates, with an optional independent
+  reviewer.
+
+#### Changed
+
+- Severity now uses three levels: `high`, `medium`, and `low`. Earlier
+  four-level records require an explicit migration or a new review.
+- Findings that depend on an unresolved contract conflict are capped at
+  `medium` and marked as requiring contract confirmation.
+
+#### Packaging
+
+- Added an MIT license, version file, and offline regression tests.
+- Internal design documents and evaluation artifacts stay outside the
+  published tree.
+
+[Full update history](NEWS.md)
+<!-- NEWS:END -->
+
 ## Release status
 
 `v0.1.0-beta` — this is a test release. The probe contract, report schema, and
@@ -32,6 +62,7 @@ gate behavior may change before 1.0.
 
 ## Contents
 
+- [Latest news](#latest-news)
 - [Release status](#release-status)
 - [Why this skill](#why-this-skill)
 - [Quick start](#quick-start)
@@ -219,8 +250,11 @@ The evaluation harness and raw reports are kept out of the published repository.
 ```text
 code-review-skill/
 ├── README.md
+├── NEWS.md
 ├── LICENSE
 ├── VERSION
+├── .github/workflows/sync-news.yml
+├── scripts/sync-news.py
 ├── skills/
 │   └── code-review/
 │       ├── SKILL.md
@@ -254,6 +288,13 @@ Issues and pull requests are welcome. For a behavior change, include:
 For a probe or schema change, update the probe document, the output contract, and the affected scripts together.
 
 Run the offline suite with `python -m unittest discover -s tests -v`. Set `CODE_REVIEW_TEST_BASH` to a Bash executable to include shell and installation checks; see [tests/README.md](tests/README.md). These checks do not call models or establish defect recall.
+
+Record user-facing changes in [NEWS.md](NEWS.md), newest release first. Pushes
+that change NEWS or its synchronizer update the README's marked news preview
+automatically. Only that preview is generated; edit the rest of this README
+normally. You can also run `python scripts/sync-news.py` locally, or add
+`--check` to detect a stale preview without changing files. Automatic commits
+use the built-in `GITHUB_TOKEN`; branch rules must allow that bot to push.
 
 ## License
 

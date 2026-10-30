@@ -1,0 +1,50 @@
+name: Sync news preview
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - NEWS.md
+      - scripts/sync-news.py
+      - tests/test_sync_news.py
+      - .github/workflows/sync-news.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-news-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Read the branch's latest state, including when a run was queued.
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Test synchronizer
+        run: python -m unittest discover -s tests -p test_sync_news.py -v
+      - name: Update preview
+        run: |
+          python scripts/sync-news.py
+          python scripts/sync-news.py --check
+      - name: Commit README if changed
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          if git diff --quiet -- README.md; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- README.md
+          git commit -m 'docs: sync latest news into README'
+          git push origin "HEAD:refs/heads/$BRANCH_NAME"
