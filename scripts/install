@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Thin wrapper for scripts/install.py.
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON="${CODE_REVIEW_PYTHON:-}"
+
+if [ -z "$PYTHON" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+        PYTHON=python3
+    elif command -v python >/dev/null 2>&1; then
+        PYTHON=python
+    else
+        echo "error: Python 3.9+ is required (set CODE_REVIEW_PYTHON)." >&2
+        exit 1
+    fi
+fi
+
+exec "$PYTHON" "$DIR/install.py" "$@"

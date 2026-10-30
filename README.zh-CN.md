@@ -4,7 +4,7 @@
 
 **基于证据的代码审查：优先静态分析，使用探针分工，并根据结果执行门禁。**
 
-技能源码位于 [`skills/code-review/`](skills/code-review/)，与宿主工具的安装目录分离。仓库提供 [`adapters/claude-code/`](adapters/claude-code/) 中的 Claude Code reviewer 适配器。当前为 beta 测试版本，版本号见 [VERSION](VERSION)。
+技能源码位于 [`skills/code-review/`](skills/code-review/)，与宿主工具的安装目录分离。仓库在 [`adapters/`](adapters/) 中提供 Claude Code 和 Codex 的 reviewer 适配器。当前为 beta 测试版本，版本号见 [VERSION](VERSION)。
 
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-6B4FBB?style=flat-square)](https://claude.com/claude-code)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-standard-1f6feb?style=flat-square)](https://agentskills.io)
@@ -22,8 +22,9 @@
 #### 新增
 
 - 四个审查探针：行为正确性、测试覆盖、仓库规范和影响分析。
-- 技能源码迁移至 `skills/code-review/`，Claude Code reviewer 适配器独立放在 `adapters/claude-code/`。
+- 技能源码迁移至 `skills/code-review/`，Claude Code 和 Codex 的 reviewer 适配器分别放在 `adapters/` 下。
 - 从 JSON 生成报告事实区和门禁结论，并可启用独立 reviewer。
+- 新增统一安装器，支持 `claude-code`、`codex` 或 `both`；默认不覆盖，支持 dry-run，`--force` 时保留时间戳备份。
 
 #### 调整
 
@@ -43,7 +44,7 @@
 
 - **三级评级**：`high`、`medium`、`low`。此前四级版本写入的记录，包括包含 `critical` 值的记录，**不兼容**当前版本；`collect-metrics` 会拒绝这些记录。使用前请重新审查，或显式迁移记录。
 - **适用范围**：以静态分析为主，使用四个探针、可选的独立 reviewer，以及从 JSON 派生的报告和门禁。不能替代测试、CI 或人工审查。
-- **验证情况**：23 项审查流程离线测试；干净项目中包含 reviewer 和阻塞门禁的端到端验证；额外的探针与 reviewer 冒烟验证。这些属于回归检查，不能据此宣称具备通用召回能力。并发缺陷识别尚未验证。
+- **验证情况**：43 项审查流程与安装离线测试；干净项目中包含 reviewer 和阻塞门禁的端到端验证；额外的探针与 reviewer 冒烟验证。这些属于回归检查，不能据此宣称具备通用召回能力。并发缺陷识别尚未验证。
 
 ## 目录
 
@@ -77,24 +78,46 @@
 
 ### 安装
 
-在 Claude Code 中使用时，将技能及 reviewer 适配器复制到项目的 `.claude` 目录。源码仓库使用 `skills/`，`.claude/` 是使用方项目的安装位置。
+源码仓库把可移植技能放在 `skills/code-review/`；安装器会把技能和对应宿主的 reviewer 适配器复制到使用方项目。默认不覆盖已有文件。
 
-安装带版本标签的 beta 版本：
+**在你的项目目录中**执行下面一条命令，同时安装 skill 和 Codex reviewer：
 
 ```bash
-git clone --branch v0.1.0-beta https://github.com/kyy-logs/code-review-skill.git
-CODE_REVIEW_SOURCE_DIR="$(pwd)/code-review-skill"
-cd /path/to/your-project
-mkdir -p .claude/skills .claude/agents
-cp -r "$CODE_REVIEW_SOURCE_DIR/skills/code-review" .claude/skills/
-cp "$CODE_REVIEW_SOURCE_DIR/adapters/claude-code/reviewer.md" .claude/agents/
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/main/scripts/install-remote.py', timeout=30).read())" --agent codex
 ```
 
-Claude Code 会以 `code-review` 识别这个技能。
+需要 Python 3.9+ 和 PATH 中可用的 Git；如果你的 Python 命令是 `python3`，替换开头的 `python` 即可。把 `codex` 改成 `claude-code` 或 `both` 可选择其他宿主。入口会把 main 下载到临时目录，调用安装器，结束后清理临时仓库，无须手动克隆或切换目录。
 
-Claude Code 的工作流程需要同时复制这两部分：只安装技能不会注册独立 reviewer。先安装[运行环境](#运行环境)中列出的依赖。如果 Python 无法导入 PyYAML，请在技能使用的解释器中执行 `python -m pip install PyYAML`；也可以通过 `CODE_REVIEW_PYTHON` 指定其他解释器。
+命令末尾可追加 `--dry-run` 预览、`--project "你的项目路径"` 指定其他项目，或 `--ref <分支或标签>` 选择包含安装器的源码版本。远程入口及默认下载来源均为 `main`。
 
-在其他宿主中使用时，将同一份 `skills/code-review/` 安装到其技能目录，并提供对应的独立上下文机制。源码目录可移植，不代表每个宿主均已验证；本仓库目前只提供 Claude Code 适配器。
+如果已经有本地源码仓库：
+
+```bash
+git clone --branch main https://github.com/kyy-logs/code-review-skill.git
+cd code-review-skill
+python scripts/install.py --agent both --project /path/to/your-project
+```
+
+也可以使用 shell 包装：
+
+```bash
+bash scripts/install --agent codex --project /path/to/your-project
+```
+
+宿主目录：
+
+| 宿主 | 技能 | Reviewer 适配器 | 派发方式 |
+|---|---|---|---|
+| Claude Code | `.claude/skills/code-review/` | `.claude/agents/reviewer.md` | `subagent_type: reviewer` |
+| Codex | `.agents/skills/code-review/` | `.codex/agents/reviewer.toml` | 自定义 agent `reviewer`（`agent_type: reviewer`） |
+
+`--agent` 可取 `claude-code`、`codex` 或 `both`。已有文件默认受保护：安装器会列出冲突并以非零状态退出；`--force` 才会替换，并先备份为带时间戳的 `.bak`。`--dry-run` 只打印计划。安装器不会修改 `.codex/config.toml` 或其他 agent 配置。
+
+`npx -y skills add ... --agent codex --yes` 只安装技能，不安装 reviewer 适配器；需要独立 reviewer 时使用上面的安装器。Node.js 22.20+ 仅用于这个可选的 `npx` 路径。
+
+其他宿主需要把 `skills/code-review/` 安装到其技能目录，并提供独立上下文机制；本仓库只提供 Claude Code 和 Codex 适配器。
+
+完整工作流需要同时安装技能和适配器：只安装技能不会注册独立 reviewer。先安装[运行环境](#运行环境)中列出的依赖。如果 Python 无法导入 PyYAML，请在技能使用的解释器中执行 `python -m pip install PyYAML`；也可以通过 `CODE_REVIEW_PYTHON` 指定其他解释器。
 
 ### 运行
 
@@ -196,7 +219,7 @@ export CODE_REVIEW_RULES_DIR=/path/to/rules
 
 ## 独立复核
 
-`skills/code-review/references/reviewer.md` 是与宿主无关的 reviewer 指令。`adapters/claude-code/reviewer.md` 是 Claude Code 适配器，安装后位于被审项目的 `.claude/agents/reviewer.md`。
+`skills/code-review/references/reviewer.md` 是与宿主无关的 reviewer 指令。`adapters/claude-code/reviewer.md` 是 Claude Code 适配器（安装到 `.claude/agents/reviewer.md`）；`adapters/codex/reviewer.toml` 是 Codex 自定义 agent 定义（安装到 `.codex/agents/reviewer.toml`）。两个适配器只负责宿主路由，都指回同一份 reviewer 指令。
 
 reviewer 读取冻结的技能、案例输入和原始探针结果，不读取参考评论、预期答案或历史报告。宿主无法提供全新上下文时，需要记录这一限制，不得编造复核裁决。
 
@@ -243,9 +266,10 @@ reviewer 读取冻结的技能、案例输入和原始探针结果，不读取�
 
 ## 运行环境
 
-- 支持 Agent Skills 的 Claude Code。
+- 支持 Agent Skills 的 Claude Code，或支持自定义 agent 的 Codex。
 - Bash、Git、awk、grep、sed。
-- Python 3.9+，并安装 PyYAML，用于报告解析和指标处理。
+- Python 3.9+；安装仅使用标准库。运行审查脚本时还需要 PyYAML，用于报告解析和指标处理。
+- Node.js 22.20+ 仅在使用可选的 `npx skills` 只装技能快捷方式时需要。
 
 ## 仓库结构
 
@@ -257,7 +281,11 @@ code-review-skill/
 ├── LICENSE
 ├── VERSION
 ├── .github/workflows/sync-news.yml
-├── scripts/sync-news.py
+├── scripts/
+│   ├── install
+│   ├── install.py
+│   ├── install-remote.py
+│   └── sync-news.py
 ├── skills/
 │   └── code-review/
 │       ├── SKILL.md
@@ -275,7 +303,8 @@ code-review-skill/
 │           ├── rule-grep
 │           └── sync-results.py
 ├── adapters/
-│   └── claude-code/reviewer.md
+│   ├── claude-code/reviewer.md
+│   └── codex/reviewer.toml
 └── tests/
 ```
 

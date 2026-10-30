@@ -10,10 +10,12 @@ in the README. Keep internal plans and evaluation artifacts out of this file.
 
 - Four review probes: behavior correctness, test coverage, repository rules,
   and impact analysis.
-- Portable skill source in `skills/code-review/`, with a separate Claude Code
-  reviewer adapter in `adapters/claude-code/`.
+- Portable skill source in `skills/code-review/`, with separate Claude Code
+  and Codex reviewer adapters in `adapters/`.
 - JSON-derived report sections and merge gates, with an optional independent
   reviewer.
+- A unified installer for `claude-code`, `codex`, or both, with dry-run,
+  conflict protection, and timestamped backups under `--force`.
 
 ### Changed
 
