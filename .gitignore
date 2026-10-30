@@ -4,7 +4,6 @@
 # Internal evaluation and review artifacts
 eval/
 docs/
-tests/
 COPY-NOTES.md
 
 # Python

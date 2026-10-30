@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# code-review skill —— 程序化判断本轮要不要派独立 reviewer
+#
+# 用法:
+#   bash scripts/review-mode <slug> [--base <rev>]
+#
+# 读取 references/probes.yaml 的 reviewer 配置，输出:
+#   run
+#   skip reason=<no_findings|only_docs|mode_never>
+
+set -euo pipefail
+
+die() { echo "错误: $*" >&2; exit 1; }
+
+usage() {
+  cat <<'EOF'
+用法: bash scripts/review-mode <slug> [--base <rev>]
+  --base  审查起点，默认 HEAD
+EOF
+}
+
+SLUG=""
+BASE="HEAD"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help|help) usage; exit 0 ;;
+    --base) [ "$#" -ge 2 ] || die "--base 需要一个 rev"; BASE="$2"; shift 2 ;;
+    -*) die "未知选项: $1" ;;
+    *) [ -z "$SLUG" ] || die "只接受一个 slug"; SLUG="$1"; shift ;;
+  esac
+done
+
+[ -n "$SLUG" ] || { usage >&2; exit 1; }
+case "$SLUG" in
+  *[!A-Za-z0-9._-]*) die "slug 只能包含字母、数字、点、下划线、连字符" ;;
+esac
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" \
+  || die "当前目录不在 git 仓库里"
+BASE_ID="$(git -C "$ROOT" rev-parse --verify "$BASE^{commit}" 2>/dev/null)" \
+  || die "解析不了 --base: $BASE"
+
+SKILL_DIR="${CODE_REVIEW_SKILL_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+CFG="$SKILL_DIR/references/probes.yaml"
+[ -f "$CFG" ] || die "找不到配置: $CFG"
+
+DIR="$ROOT/docs/work/active/$SLUG"
+
+# --- 读 reviewer 配置 ---
+MODE="auto"
+POLICY="strict"
+SKIP_RULES=()
+
+while IFS='=' read -r k v; do
+  case "$k" in
+    mode)   MODE="$v" ;;
+    policy) POLICY="$v" ;;
+    skip)   SKIP_RULES+=("$v") ;;
+  esac
+done < <(awk '
+  /^reviewer:/ { inrev=1; next }
+  inrev && /^[^[:space:]#]/ { inrev=0 }
+  inrev && /^[[:space:]]+mode:/ {
+    v=$2; sub(/#.*/, "", v); gsub(/[[:space:]]/, "", v); print "mode=" v; next
+  }
+  inrev && /^[[:space:]]+policy:/ {
+    v=$2; sub(/#.*/, "", v); gsub(/[[:space:]]/, "", v); print "policy=" v; next
+  }
+  inrev && /^[[:space:]]+skip_when:/ { inskip=1; next }
+  inrev && inskip && /^[[:space:]]+- / {
+    v=$2; sub(/#.*/, "", v); gsub(/[[:space:]]/, "", v); print "skip=" v; next
+  }
+  inrev && inskip && /^[[:space:]]+[A-Za-z_]+:/ { inskip=0 }
+' "$CFG")
+
+case "$MODE" in
+  always|auto|never) ;;
+  *) die "reviewer.mode 只能是 always / auto / never（当前: $MODE）" ;;
+esac
+case "$POLICY" in
+  strict|advisory) ;;
+  *) die "reviewer.policy 只能是 strict / advisory（当前: $POLICY）" ;;
+esac
+
+_changed_files() {
+  git -C "$ROOT" -c core.quotePath=false diff --name-only "$BASE_ID" -- 2>/dev/null || true
+  git -C "$ROOT" -c core.quotePath=false ls-files --others --exclude-standard 2>/dev/null || true
+}
+
+# 0 = 没有 high；1 = 有；2 = 判断不了（没有探针报告）
+_no_high_findings() {
+  local result
+  result="$("${CODE_REVIEW_PYTHON:-python}" -X utf8 "$SKILL_DIR/scripts/sync-results.py" \
+    --review-dir "$DIR" --registry "$CFG" --probes --has-high)" \
+    || die "探针报告无法解析，不能判断 reviewer 模式"
+  [ "$result" = false ]
+}
+
+# 0 = 改动全是文档；1 = 含代码/配置/无改动
+_only_docs() {
+  local files
+  files="$(_changed_files | sed '/^[[:space:]]*$/d' | sort -u)"
+  [ -n "$files" ] || return 1
+  if printf '%s\n' "$files" | grep -qvE '\.(md|rst|txt)$'; then
+    return 1
+  fi
+  return 0
+}
+
+decision="run"
+reason="-"
+
+case "$MODE" in
+  never)
+    decision="skip"; reason="mode_never" ;;
+  always)
+    decision="run" ;;
+  auto)
+    # 已有 high 时不得跳过：跳过只适用于「没有东西要裁」
+    if _no_high_findings; then
+      nf=0
+    else
+      nf=$?
+    fi
+
+    if [ "$nf" -ne 0 ]; then
+      decision="run"
+      if [ "$nf" -eq 1 ]; then reason="has_findings"; else reason="no_probe_reports"; fi
+    else
+      for rule in ${SKIP_RULES[@]+"${SKIP_RULES[@]}"}; do
+        case "$rule" in
+          no_findings)
+            decision="skip"; reason="no_findings"; break ;;
+          only_docs)
+            if _only_docs; then decision="skip"; reason="only_docs"; break; fi ;;
+          *) : ;;  # 未知规则忽略
+        esac
+      done
+    fi ;;
+esac
+
+if [ "$decision" = "run" ]; then
+  echo "run"
+else
+  echo "skip reason=$reason"
+fi
