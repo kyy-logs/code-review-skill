@@ -44,7 +44,7 @@
 
 - **三级评级**：`high`、`medium`、`low`。此前四级版本写入的记录，包括包含 `critical` 值的记录，**不兼容**当前版本；`collect-metrics` 会拒绝这些记录。使用前请重新审查，或显式迁移记录。
 - **适用范围**：以静态分析为主，使用四个探针、可选的独立 reviewer，以及从 JSON 派生的报告和门禁。不能替代测试、CI 或人工审查。
-- **验证情况**：43 项审查流程与安装离线测试；干净项目中包含 reviewer 和阻塞门禁的端到端验证；额外的探针与 reviewer 冒烟验证。这些属于回归检查，不能据此宣称具备通用召回能力。并发缺陷识别尚未验证。
+- **验证情况**：50 项审查流程、NEWS 与安装离线测试；干净项目中包含 reviewer 和阻塞门禁的端到端验证；额外的探针与 reviewer 冒烟验证。这些属于回归检查，不能据此宣称具备通用召回能力。并发缺陷识别尚未验证。
 
 ## 目录
 
@@ -280,11 +280,14 @@ code-review-skill/
 ├── NEWS.md
 ├── LICENSE
 ├── VERSION
-├── .github/workflows/sync-news.yml
+├── .github/workflows/
+│   ├── news-update.yml
+│   └── sync-news.yml
 ├── scripts/
 │   ├── install
 │   ├── install.py
 │   ├── install-remote.py
+│   ├── news-update.py
 │   └── sync-news.py
 ├── skills/
 │   └── code-review/
@@ -321,7 +324,9 @@ code-review-skill/
 
 使用 `python -m unittest discover -s tests -v` 运行离线测试。通过 `CODE_REVIEW_TEST_BASH` 指定 Bash 可执行文件后，还会运行 Shell 和安装检查，详见 [tests/README.md（英文）](tests/README.md)。这些检查不调用模型，也不能证明缺陷召回能力。
 
-在 [NEWS.md（英文）](NEWS.md) 中记录面向用户的变化，最新版本放在最前面。推送 NEWS 或同步工具的改动后，流水线会自动更新英文 README 的最新动态区域；其余内容正常编辑。也可以在本地执行 `python scripts/sync-news.py`，加上 `--check` 时只检查是否需要更新，不修改文件。自动提交使用内置 `GITHUB_TOKEN`，分支规则需要允许该 bot 推送。
+在 [NEWS.md（英文）](NEWS.md) 中记录面向用户的变化，最新版本放在最前面。`## Unreleased` 块由最近 tag 以来的提交自动生成，并由 `UNRELEASED:START` / `UNRELEASED:END` 标记；push 到 `main` 时只替换该块，已发布段落保持不变。README 预览使用最新正式版本，不展示 Unreleased。建议使用 Conventional Commits（`feat`、`fix`、`perf`、`refactor`）；`docs`、`chore`、`test`、`ci`、`build` 会跳过，旧式提交按关键词兜底。也可以在本地执行 `python scripts/news-update.py`，加上 `--check` 只检查块是否过期。
+
+推送 NEWS 或同步工具的改动后，流水线会自动更新英文 README 的最新动态区域；其余内容正常编辑。也可以在本地执行 `python scripts/sync-news.py`，加上 `--check` 时只检查是否需要更新，不修改文件。自动提交使用内置 `GITHUB_TOKEN`，分支规则需要允许该 bot 推送。
 
 修改英文文档时，请同步更新本中文版。中文翻译及最新动态摘要目前由人工维护。
 

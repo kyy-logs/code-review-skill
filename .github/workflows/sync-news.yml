@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sync-news-${{ github.ref }}
+  group: news-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

@@ -4,8 +4,11 @@ These tests exercise the review pipeline's records, three-level severity
 validation, report rendering, and gate behavior. They do not call a model and
 do not replace recall or reviewer evaluation.
 
-Release-note tests run the NEWS-to-README synchronizer against temporary
-documents, including stale previews, invalid markers, and repeated runs.
+Release-note tests run the NEWS Unreleased generator against temporary Git
+histories, including Conventional Commits, keyword fallback, skipped release
+subjects, stale blocks, and missing markers. They also exercise the
+NEWS-to-README synchronizer, including its Unreleased skip, stale previews,
+invalid markers, and repeated runs.
 
 Installation checks cover both the Claude Code and Codex layouts, the unified
 installer, repeated installs, existing-config protection, `--dry-run`, and

@@ -59,7 +59,7 @@ gate behavior may change before 1.0.
 - **Scope:** static-first review with four probes, an optional independent
   reviewer, and JSON-derived report/gate output. It does not replace tests, CI,
   or human review.
-- **Validation:** 43 offline pipeline and installation tests; a clean-project end-to-end run with
+- **Validation:** 50 offline pipeline, NEWS, and installation tests; a clean-project end-to-end run with
   the reviewer and a failing gate; additional probe/reviewer smokes. These are
   regression checks, not a general recall claim. Concurrency-defect detection
   has not been validated.
@@ -303,11 +303,14 @@ code-review-skill/
 ├── NEWS.md
 ├── LICENSE
 ├── VERSION
-├── .github/workflows/sync-news.yml
+├── .github/workflows/
+│   ├── news-update.yml
+│   └── sync-news.yml
 ├── scripts/
 │   ├── install
 │   ├── install.py
 │   ├── install-remote.py
+│   ├── news-update.py
 │   └── sync-news.py
 ├── skills/
 │   └── code-review/
@@ -344,10 +347,19 @@ For a probe or schema change, update the probe document, the output contract, an
 
 Run the offline suite with `python -m unittest discover -s tests -v`. Set `CODE_REVIEW_TEST_BASH` to a Bash executable to include shell and installation checks; see [tests/README.md](tests/README.md). These checks do not call models or establish defect recall.
 
-Record user-facing changes in [NEWS.md](NEWS.md), newest release first. Pushes
-that change NEWS or its synchronizer update the README's marked news preview
-automatically. Only that preview is generated; edit the rest of this README
-normally. You can also run `python scripts/sync-news.py` locally, or add
+Record user-facing changes in [NEWS.md](NEWS.md), newest release first. The
+`## Unreleased` block is generated from commits since the latest tag and is
+delimited by `UNRELEASED:START` / `UNRELEASED:END`; a push to `main` replaces
+only that block and preserves released sections. The README preview uses the
+latest released version, not `Unreleased`. Prefer Conventional Commits
+(`feat`, `fix`, `perf`, `refactor`); `docs`, `chore`, `test`, `ci`, and `build`
+are skipped. Older subjects use a small keyword fallback. Run
+`python scripts/news-update.py` locally, or add `--check` to detect a stale
+block without changing files.
+
+Pushes that change NEWS or its synchronizer update the README's marked news
+preview automatically. Only that preview is generated; edit the rest of this
+README normally. You can also run `python scripts/sync-news.py` locally, or add
 `--check` to detect a stale preview without changing files. Automatic commits
 use the built-in `GITHUB_TOKEN`; branch rules must allow that bot to push.
 Keep [README.zh-CN.md](README.zh-CN.md) aligned when changing this document;

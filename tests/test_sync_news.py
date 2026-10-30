@@ -73,6 +73,14 @@ class NewsSyncTests(unittest.TestCase):
         self.assertEqual(self.readme.read_text(encoding="utf-8"), EXPECTED)
         self.assertEqual(self.news.read_text(encoding="utf-8"), NEWS)
 
+    def test_unreleased_block_is_not_rendered_as_the_latest_release(self):
+        news = ("# News\n\n<!-- UNRELEASED:START -->\n## Unreleased\n\n"
+                "- Draft change.\n<!-- UNRELEASED:END -->\n\n" + NEWS)
+        self.news.write_text(news, encoding="utf-8")
+        result = self.run_sync()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.readme.read_text(encoding="utf-8"), EXPECTED)
+
     def test_check_detects_stale_preview_without_writing_and_rerun_is_noop(self):
         before = self.readme.read_bytes()
         stale = self.run_sync("--check")
