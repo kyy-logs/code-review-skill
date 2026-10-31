@@ -8,7 +8,9 @@ and evaluation artifacts out of this file.
 <!-- UNRELEASED:START -->
 ## Unreleased
 
-_No user-facing changes since the latest release._
+### Added
+
+- add canonical review delivery summary
 
 <!-- UNRELEASED:END -->
 
