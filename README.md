@@ -265,34 +265,13 @@ code-review-skill/
 
 ## Contributing
 
-Issues and pull requests are welcome. For a behavior change, include:
+Issues and pull requests are welcome. For a behavior change, include the review target (repo and base/head), expected and observed result or gate decision, and evidence that distinguishes them.
 
-- the review target (repo and base/head),
-- the expected finding or gate decision,
-- the observed finding or gate decision,
-- the evidence that distinguishes them.
+For a probe or schema change, update the probe document, output contract, and affected scripts together.
 
-For a probe or schema change, update the probe document, the output contract, and the affected scripts together.
+Run tests with `python -m unittest discover -s tests -v`; set `CODE_REVIEW_TEST_BASH` to include shell and installation checks. These tests do not call models or establish defect recall.
 
-Run the offline suite with `python -m unittest discover -s tests -v`. Set `CODE_REVIEW_TEST_BASH` to a Bash executable to include shell and installation checks; see [tests/README.md](tests/README.md). These checks do not call models or establish defect recall.
-
-Record user-facing changes in [NEWS.md](NEWS.md), newest release first. The
-`## Unreleased` block is generated from commits since the latest tag and is
-delimited by `UNRELEASED:START` / `UNRELEASED:END`; a push to `main` replaces
-only that block and preserves released sections. The README preview uses the
-latest released version, not `Unreleased`. Prefer Conventional Commits
-(`feat`, `fix`, `perf`, `refactor`); `docs`, `chore`, `test`, `ci`, and `build`
-are skipped. Older subjects use a small keyword fallback. Run
-`python scripts/news-update.py` locally, or add `--check` to detect a stale
-block without changing files.
-
-Pushes that change NEWS or its synchronizer update the README's marked news
-preview automatically. Only that preview is generated; edit the rest of this
-README normally. You can also run `python scripts/sync-news.py` locally, or add
-`--check` to detect a stale preview without changing files. Automatic commits
-use the built-in `GITHUB_TOKEN`; branch rules must allow that bot to push.
-Keep [README.zh-CN.md](README.zh-CN.md) aligned when changing this document;
-the Chinese translation, including its news summary, is maintained manually.
+For user-facing changes, add an entry to `NEWS.md`. Pushes to `main` update the README news preview; locally, run `python scripts/news-update.py` and `python scripts/sync-news.py` (use `--check` to verify only). Keep the Chinese README aligned.
 
 ## License
 

@@ -268,22 +268,13 @@ code-review-skill/
 
 ## 参与贡献
 
-欢迎提交 issue 和 pull request。涉及行为变更时，请说明：
+欢迎提交 issue 和 pull request。行为变更请附：审查目标（仓库及 base/head）、预期与实际结果/门禁结论，以及区分二者的证据。
 
-- 审查目标：仓库及 base/head。
-- 预期发现的问题或门禁结论。
-- 实际发现的问题或门禁结论。
-- 能区分预期与实际的证据。
+探针或 schema 变更时，请同步更新探针文档、输出契约和相关脚本。
 
-修改探针或输出结构时，需要同时更新探针文档、输出契约和受影响的脚本。
+用 `python -m unittest discover -s tests -v` 运行测试；设置 `CODE_REVIEW_TEST_BASH` 可包含 shell 和安装检查。这些测试不调用模型，也不能证明缺陷召回能力。
 
-使用 `python -m unittest discover -s tests -v` 运行离线测试。通过 `CODE_REVIEW_TEST_BASH` 指定 Bash 可执行文件后，还会运行 Shell 和安装检查，详见 [tests/README.md（英文）](tests/README.md)。这些检查不调用模型，也不能证明缺陷召回能力。
-
-在 [NEWS.md（英文）](NEWS.md) 中记录面向用户的变化，最新版本放在最前面。`## Unreleased` 块由最近 tag 以来的提交自动生成，并由 `UNRELEASED:START` / `UNRELEASED:END` 标记；push 到 `main` 时只替换该块，已发布段落保持不变。README 预览使用最新正式版本，不展示 Unreleased。建议使用 Conventional Commits（`feat`、`fix`、`perf`、`refactor`）；`docs`、`chore`、`test`、`ci`、`build` 会跳过，旧式提交按关键词兜底。也可以在本地执行 `python scripts/news-update.py`，加上 `--check` 只检查块是否过期。
-
-推送 NEWS 或同步工具的改动后，流水线会自动更新英文 README 的最新动态区域；其余内容正常编辑。也可以在本地执行 `python scripts/sync-news.py`，加上 `--check` 时只检查是否需要更新，不修改文件。自动提交使用内置 `GITHUB_TOKEN`，分支规则需要允许该 bot 推送。
-
-修改英文文档时，请同步更新本中文版。中文翻译及最新动态摘要目前由人工维护。
+面向用户的变化写入 `NEWS.md`。push 到 `main` 会更新 README 新闻预览；本地可用 `python scripts/news-update.py` 和 `python scripts/sync-news.py`，加 `--check` 只做校验。修改英文文档时请同步更新本中文版。
 
 ## 许可证
 
