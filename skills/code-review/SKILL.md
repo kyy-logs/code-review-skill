@@ -126,8 +126,12 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
    ```bash
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" render-report {slug}
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" verify-report {slug}
+   bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" summary {slug}
    ```
    校验从相同 JSON 重新渲染并比对 ID、位置、证据、严重级别、状态和计数。
+   `summary` 会先校验报告，再输出最终答复可引用的机器摘要；报告不一致时不输出摘要。
+   最终答复中的 high/medium/low 数量、finding ID 和阻塞结论必须来自该摘要，
+   不得新增 JSON 中不存在的 finding，也不得省略 JSON 中已记录的 high。
    渲染先完整校验再原子更新，可重复执行，不更改 JSON；标记缺失或重复时停止，不覆盖整份报告。
    主执行器可补充解释及修复建议，不得改写自动区域或推翻已知阻塞结论。
    自动区域的“无已记录阻塞项”不代表验收、覆盖率、测试或 CI 已通过。

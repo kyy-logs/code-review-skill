@@ -73,6 +73,42 @@ class ThreeSeverityGateTests(BehaviorFixture, unittest.TestCase):
         result = self.command('gate-pass', 'example', 'code-review')
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_summary_reports_counts_ids_and_blockers_from_json(self):
+        self.add_high()
+        first = self.records['behavior-review']['findings'][0]
+        self.records['behavior-review']['findings'] += [
+            dict(first, id='behavior-review-2', severity='medium'),
+            dict(first, id='behavior-review-3', severity='low'),
+        ]
+        self.write_records()
+        self.render()
+        result = self.command('summary', 'example')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('findings: high=1 medium=1 low=1', result.stdout)
+        self.assertIn('high_ids: behavior-review-1', result.stdout)
+        self.assertIn('medium_ids: behavior-review-2', result.stdout)
+        self.assertIn('low_ids: behavior-review-3', result.stdout)
+        self.assertIn('reconcile: total=1 done=0 pending=1', result.stdout)
+        self.assertIn('status: 阻塞', result.stdout)
+
+    def test_summary_rejects_tampered_report(self):
+        self.add_high()
+        self.render()
+        report = self.review / 'code-review.md'
+        report.write_text(report.read_text(encoding='utf-8').replace(
+            'behavior-review-1', 'behavior-review-9'), encoding='utf-8')
+        result = self.command('summary', 'example')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('审查摘要', result.stdout)
+
+    def test_summary_zero_findings_is_explicit(self):
+        self.render()
+        result = self.command('summary', 'example')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('findings: high=0 medium=0 low=0', result.stdout)
+        self.assertIn('high_ids: -', result.stdout)
+        self.assertIn('status: 无已记录阻塞项', result.stdout)
+
     def test_security_metrics_and_scorecard_use_three_levels(self):
         self.render()
         result = self.command('security', 'example', '--high', '2', '--medium', '3', '--low', '4')
