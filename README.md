@@ -69,6 +69,12 @@ gate behavior may change before 1.0.
 
 ## Why this skill
 
+**No self-grading.**
+
+The implementation context does not sign off on its own work. Four probes run in fresh contexts, each files its own evidence, and the gate is derived from those records.
+
+*This is separation of duties, not independent human adjudication; all probes still use the same model.*
+
 | | |
 |---|---|
 | **Static-first** | Works on a fresh clone or a partial checkout. Coverage is optional, not a prerequisite. |
