@@ -41,6 +41,15 @@ It never modifies the code under review.
   cancellation cleanup paths and distinguishes a cancel notification from the
   task actually stopping.
 
+#### Validation
+
+- Same-version reviews showed lower wall-clock time with four parallel probes:
+  Keycloak about 2.5x, x01 about 2.9x, and the x01 impact-only repeat about
+  2.7x.
+- Token usage did not improve consistently, and target recall did not increase
+  (the x01 impact target was found in 1 of 3 serial and 1 of 3 parallel runs).
+  These are small samples; this is not a general speed or recall claim.
+
 [Full update history](NEWS.md)
 <!-- NEWS:END -->
 
