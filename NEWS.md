@@ -8,12 +8,32 @@ and evaluation artifacts out of this file.
 <!-- UNRELEASED:START -->
 ## Unreleased
 
-### Added
-
-- Add automatic NEWS unreleased updates
-- Add one-command remote skill installation
+_No user-facing changes since the latest release._
 
 <!-- UNRELEASED:END -->
+
+## v0.1.0-beta.2 (2026-10-31)
+
+### Added
+
+- Parallel four-probe execution: each probe gets a fresh agent and writes its
+  own JSON; hosts without four slots run in batches or record a serial fallback.
+- Automatic NEWS unreleased updates and one-command remote skill installation.
+
+### Changed
+
+- Probe dispatch now includes bounded local-search and background-task cleanup
+  rules, and `behavior-review` starts from the diff and stops when evidence is
+  sufficient.
+- `test-coverage` hands valid measured coverage back to the main executor;
+  cross-probe duplicates remain separate records until a later deduplication
+  design is adopted.
+
+### Fixed
+
+- `behavior-review` now checks asynchronous completion, exception, and
+  cancellation cleanup paths and distinguishes a cancel notification from the
+  task actually stopping.
 
 ## v0.1.0-beta (2026-10-30)
 
