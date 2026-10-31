@@ -114,15 +114,17 @@ high finding 处置后，重新执行对应探针并上报结果，不得直接�
 已指定的覆盖率报告路径读不到时，应记为 `error`。
 默认配置指向的资源缺失或损坏同样属于 `error`，不得伪装成正常跳过。
 
-所有探针报告写完后同步原始结果，并使上一批对账状态失效；此时尚不记录 reconciliation：
+## 5. 汇总与落盘
+
+### 同步探针结果
+
+由主执行器在所有探针报告写完后同步原始结果，并使上一批对账状态失效；此时尚不记录 reconciliation：
 
 ```bash
 bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug} --probes
 ```
 
 `required` 从注册表读取，各级数量从 JSON 逐条计算，不再接受 `probe` / `reconcile` 手填计数。
-
-## 5. 汇总与落盘
 
 ### 重复问题处理
 
