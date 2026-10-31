@@ -17,7 +17,6 @@ import yaml
 
 SEVERITIES = ('high', 'medium', 'low')
 STATUSES = ('open', 'reconciled', 'wontfix', 'false-positive')
-VERDICTS = ('confirmed', 'downgraded', 'rejected', 'escalated', 'unverified')
 NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*\Z')
 
 
@@ -81,7 +80,7 @@ def finding(item, probe):
     for key in item:
         text(item[key], f'finding.{key}')
     require(item['probe'] == probe, f"{item['id']}: probe 不匹配")
-    pattern = r'R[1-9][0-9]*' if probe == 'reviewer' else re.escape(probe) + r'-[1-9][0-9]*'
+    pattern = re.escape(probe) + r'-[1-9][0-9]*'
     require(re.fullmatch(pattern, item['id']) is not None, f"非法 finding ID: {item['id']}")
     require(item['severity'] in SEVERITIES, f"{item['id']}: 非法 severity")
     require(item['status'] in STATUSES, f"{item['id']}: 非法 status")
@@ -125,62 +124,14 @@ def read_probes(directory, configuration):
     return summaries, findings
 
 
-def apply_reviewer(directory, findings):
-    block = load_record(directory / 'reviewer.json')
-    fields(block, ('decision', 'verdicts', 'findings'), ('reason',), 'reviewer-result')
-    require(block['decision'] in ('run', 'skip'), 'reviewer decision 必须为 run / skip')
-    require(isinstance(block['verdicts'], list) and isinstance(block['findings'], list), 'verdicts / findings 必须为数组')
-    if block['decision'] == 'skip':
-        text(block.get('reason'), 'reviewer.reason')
-        require(not block['verdicts'] and not block['findings'], 'skip 不能包含裁决或新问题')
-    elif 'reason' in block:
-        text(block['reason'], 'reviewer.reason')
-    effective = deepcopy(findings)
-    seen = set()
-    for verdict in block['verdicts']:
-        fields(verdict, ('id', 'verdict', 'severity', 'evidence'), (), 'verdict')
-        for key in verdict:
-            text(verdict[key], f'verdict.{key}')
-        identifier = verdict['id']
-        require(identifier in findings, f'裁决引用未知 finding: {identifier}')
-        require(identifier not in seen, f'重复裁决: {identifier}')
-        seen.add(identifier)
-        require(verdict['verdict'] in VERDICTS and verdict['severity'] in SEVERITIES, f'{identifier}: 非法裁决或 severity')
-        old = SEVERITIES.index(findings[identifier]['severity'])
-        new = SEVERITIES.index(verdict['severity'])
-        kind = verdict['verdict']
-        if kind == 'downgraded':
-            require(new > old, f'{identifier}: downgraded 必须降级')
-        elif kind == 'escalated':
-            require(new < old, f'{identifier}: escalated 必须升级')
-        else:
-            require(findings[identifier]['severity'] == verdict['severity'],
-                    f'{identifier}: {kind} 不得改变 severity')
-        item = effective[identifier]
-        item['severity'] = verdict['severity']
-        if kind == 'rejected':
-            item['status'] = 'false-positive'
-        elif kind == 'unverified' or item['status'] == 'false-positive':
-            item['status'] = 'open'
-        require(item['status'] != 'wontfix' or item['severity'] in ('medium', 'low'), f'{identifier}: 升级后不得保留 wontfix')
-    for raw in block['findings']:
-        item = finding(raw, 'reviewer')
-        require(item['id'] not in effective, f"重复 finding ID: {item['id']}")
-        effective[item['id']] = item
-    return effective, block
-
-
 def summarize(directory, configuration, probes_only=False):
     probes, findings = read_probes(directory, registry(configuration))
     reconciliation = None
-    final, reviewer = findings, None
     if not probes_only:
-        final, reviewer = apply_reviewer(directory, findings)
-        severe = [item for item in final.values() if item['severity'] == 'high']
+        severe = [item for item in findings.values() if item['severity'] == 'high']
         done = sum(item['status'] in ('reconciled', 'false-positive') for item in severe)
         reconciliation = dict(total=len(severe), done=done, pending=len(severe) - done)
-    return dict(probes=probes, reconcile=reconciliation, original_findings=findings,
-                findings=list(final.values()), reviewer=reviewer)
+    return dict(probes=probes, reconcile=reconciliation, findings=list(findings.values()))
 
 
 def markdown(value):
@@ -198,7 +149,7 @@ def render_sections(summary):
         rows.append('| ' + ' | '.join(markdown(value) for value in
                     (p['name'], '是' if p['required'] else '否', status, p['duration'],
                      p['high'], p['medium'], p['low'], p['reason'])) + ' |')
-    rows += ['', '### 问题详情（应用裁决后）', '']
+    rows += ['', '### 问题详情', '']
     for item in summary['findings']:
         rows += [f"#### [{item['severity']}] {markdown(item['summary'])}", '',
                  f"- 问题 ID：{markdown(item['id'])}",
@@ -210,29 +161,13 @@ def render_sections(summary):
         rows.append('')
     if not summary['findings']:
         rows.append('本轮没有记录 finding。')
-    reviewer = summary['reviewer']
-    verdicts = [f"Reviewer decision：{reviewer['decision']}" +
-                (f"；原因：{markdown(reviewer['reason'])}" if reviewer.get('reason') else ''), '',
-                '| 问题 ID | 裁决 | 原级别 | 最终级别 | 依据 |', '|---|---|---|---|---|']
-    for v in reviewer['verdicts']:
-        original = summary['original_findings'][v['id']]['severity']
-        verdicts.append('| ' + ' | '.join(markdown(value) for value in
-                        (v['id'], v['verdict'], original, v['severity'], v['evidence'])) + ' |')
-    judged = {v['id'] for v in reviewer['verdicts']}
-    for item in summary['original_findings'].values():
-        if item['id'] not in judged:
-            verdicts.append('| ' + ' | '.join(markdown(value) for value in
-                            (item['id'], '未裁决', item['severity'], item['severity'], '保留现有状态')) + ' |')
-    for item in reviewer['findings']:
-        verdicts.append('| ' + ' | '.join(markdown(value) for value in
-                        (item['id'], 'new', '—', item['severity'], item['evidence'])) + ' |')
     r = summary['reconcile']
-    verdicts += ['', f"reconciliation：total={r['total']} / done={r['done']} / pending={r['pending']}"]
+    rows += ['', f"reconciliation：total={r['total']} / done={r['done']} / pending={r['pending']}"]
     failed = [p['name'] for p in summary['probes'] if p['required'] and p['status'] in ('failed', 'error')]
     gate = '问题与探针状态：' + ('**阻塞**' if r['pending'] or failed else '**无已记录阻塞项**')
     gate += f"。待处理严重问题 {r['pending']} 条；required 探针失败或错误 {len(failed)} 个。"
     gate += '\n\n此结果不代表验收、覆盖率、测试或 CI 等其他条件已全部满足。'
-    return dict(probes='\n'.join(rows).strip(), reviewer='\n'.join(verdicts).strip(), gate=gate)
+    return dict(probes='\n'.join(rows).strip(), gate=gate)
 
 
 def update_report(directory, sections, check=False):
@@ -241,8 +176,12 @@ def update_report(directory, sections, check=False):
         raw = stream.read()
     newline = '\r\n' if '\r\n' in raw else '\n'
     source = raw.replace('\r\n', '\n')
-    require(not re.search(r'^```json (?:probe-result|reviewer-result)\b', source, re.M),
+    require(not re.search(r'^```json probe-result\b', source, re.M),
             '原始记录须保存为独立 JSON，最终报告不得嵌入机器记录区块')
+    require('<!-- code-review:reviewer:start -->' not in source
+            and '<!-- code-review:reviewer:end -->' not in source
+            and re.search(r'^```json reviewer-result', source, re.M) is None,
+            '报告仍包含旧版 Reviewer 区域；reviewer 功能已移除，请迁移或删除该区域后重新渲染')
     updated = source
     for name, content in sections.items():
         begin, end = f'<!-- code-review:{name}:start -->', f'<!-- code-review:{name}:end -->'
@@ -293,7 +232,7 @@ def main():
     try:
         summary = summarize(args.review_dir, args.registry, args.probes)
         if args.render or args.write_report or args.check_report:
-            require(not args.probes, '渲染和展示校验需要最终裁决结果')
+            require(not args.probes, '渲染和展示校验需要最终同步结果')
             sections = render_sections(summary)
             if args.write_report or args.check_report:
                 update_report(args.review_dir, sections, check=args.check_report)

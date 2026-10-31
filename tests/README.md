@@ -2,7 +2,7 @@
 
 These tests exercise the review pipeline's records, three-level severity
 validation, report rendering, and gate behavior. They do not call a model and
-do not replace recall or reviewer evaluation.
+do not replace recall evaluation.
 
 Release-note tests run the NEWS Unreleased generator against temporary Git
 histories, including Conventional Commits, keyword fallback, skipped release

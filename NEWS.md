@@ -12,6 +12,19 @@ _No user-facing changes since the latest release._
 
 <!-- UNRELEASED:END -->
 
+## v0.1.0-beta.3 (2026-10-31)
+
+### Removed
+
+- Removed the independent reviewer and its Claude Code/Codex adapters. The four
+  probes now feed the report and gate directly from raw findings; `reviewer.json`,
+  `review-mode`, and reviewer-adapter installation are no longer used.
+
+### Changed
+
+- The installer now installs only the host skill layout. `--agent` selects the
+  Claude Code or Codex skill directory, not a reviewer adapter.
+
 ## v0.1.0-beta.2 (2026-10-31)
 
 ### Added

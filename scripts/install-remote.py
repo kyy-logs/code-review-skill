@@ -21,7 +21,7 @@ DEFAULT_REF = "main"
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Download and install code-review with its reviewer adapter.")
+        description="Download and install the code-review skill.")
     parser.add_argument("--agent", required=True, choices=("claude-code", "codex", "both"))
     parser.add_argument("--project", default=os.getcwd(), help="target project (default: cwd)")
     parser.add_argument("--ref", default=DEFAULT_REF, help="Git branch or tag to download")

@@ -11,7 +11,10 @@ class ThreeSeverityTests(BehaviorFixture, unittest.TestCase):
     def test_three_levels_are_counted_and_only_high_enters_reconciliation(self):
         self.add_high()
         first = self.records['behavior-review']['findings'][0]
-        self.records['behavior-review']['findings'] += [dict(first, id='behavior-review-2', severity='medium'), dict(first, id='behavior-review-3', severity='low')]
+        self.records['behavior-review']['findings'] += [
+            dict(first, id='behavior-review-2', severity='medium'),
+            dict(first, id='behavior-review-3', severity='low'),
+        ]
         self.write_records()
         originals = {p: p.read_bytes() for p in self.review.rglob('*.json')}
         result = self.summary()
@@ -23,30 +26,26 @@ class ThreeSeverityTests(BehaviorFixture, unittest.TestCase):
         self.assertEqual(rendered.returncode, 0, rendered.stderr)
         self.assertIn('| high | medium | low |', rendered.stdout)
 
-    def test_unsupported_levels_fail_in_findings_and_verdicts(self):
+    def test_unsupported_levels_fail_in_findings(self):
         for severity in ('critical', 'CRITICAL', 'urgent'):
             with self.subTest(severity=severity):
                 self.add_high()
                 self.records['behavior-review']['findings'][0]['severity'] = severity
                 self.write_records()
                 self.assertNotEqual(self.helper('--probes').returncode, 0)
-                self.add_high()
-                self.reviewer['verdicts'] = [dict(id='behavior-review-1', verdict='confirmed', severity=severity, evidence='Checked contract.')]
-                self.write_records()
-                self.assertNotEqual(self.helper().returncode, 0)
 
-    def test_downgrade_removes_blocker_but_does_not_rewrite_raw_count(self):
+
+    def test_raw_reconciled_high_closes_reconciliation(self):
         self.add_high()
-        self.reviewer['verdicts'] = [dict(id='behavior-review-1', verdict='downgraded', severity='medium', evidence='No demonstrated severe consequence.')]
+        finding = self.records['behavior-review']['findings'][0]
+        finding['status'] = 'reconciled'
+        finding['reconciled_by'] = 'Fixed in follow-up'
+        self.records['behavior-review']['status'] = 'passed'
         self.write_records()
         result = self.summary()
         self.assertEqual(result['probes'][0]['high'], 1)
-        self.assertEqual(result['findings'][0]['severity'], 'medium')
-        self.assertEqual(result['reconcile']['pending'], 0)
-        self.reviewer['verdicts'][0]['severity'] = 'high'
-        self.write_records()
-        self.assertNotEqual(self.helper().returncode, 0)
-
+        self.assertEqual(result['reconcile'], dict(total=1, done=1, pending=0))
+        self.assertEqual(result['findings'][0]['status'], 'reconciled')
 
 @unittest.skipUnless(os.environ.get('CODE_REVIEW_TEST_BASH'), 'Bash is required')
 class ThreeSeverityGateTests(BehaviorFixture, unittest.TestCase):
@@ -67,8 +66,8 @@ class ThreeSeverityGateTests(BehaviorFixture, unittest.TestCase):
         self.add_high()
         item = self.records['behavior-review']['findings'][0]
         item['severity'] = 'medium'
-        self.records['behavior-review'].update(status='passed', findings=[item, dict(item, id='behavior-review-2', severity='low')])
-        self.reviewer = dict(decision='skip', reason='no_findings', verdicts=[], findings=[])
+        self.records['behavior-review'].update(
+            status='passed', findings=[item, dict(item, id='behavior-review-2', severity='low')])
         self.write_records()
         self.render()
         result = self.command('gate-pass', 'example', 'code-review')
@@ -119,7 +118,10 @@ class ThreeSeverityGateTests(BehaviorFixture, unittest.TestCase):
         for level, success in (('HIGH', True), ('MEDIUM', True), ('LOW', True), ('CRITICAL', False)):
             with self.subTest(level=level):
                 path.write_text(f'### SEC-001 [{level}] SQL rule\n\n**检测模式**: `unsafeSql`\n', encoding='utf-8')
-                result = subprocess.run([os.environ['CODE_REVIEW_TEST_BASH'], str(fixtures.SKILL / 'scripts/rule-grep'), '--list'], cwd=self.root, env=dict(os.environ, CODE_REVIEW_RULES_DIR=str(rules)), capture_output=True, text=True, encoding='utf-8', timeout=30)
+                result = subprocess.run(
+                    [os.environ['CODE_REVIEW_TEST_BASH'], str(fixtures.SKILL / 'scripts/rule-grep'), '--list'],
+                    cwd=self.root, env=dict(os.environ, CODE_REVIEW_RULES_DIR=str(rules)),
+                    capture_output=True, text=True, encoding='utf-8', timeout=30)
                 self.assertEqual(result.returncode == 0, success, result.stderr)
 
 

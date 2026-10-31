@@ -30,9 +30,8 @@ class RemoteInstallerTests(unittest.TestCase):
         cls.addClassCleanup(cls.temporary.cleanup)
         cls.source = Path(cls.temporary.name) / "source repository"
         cls.source.mkdir()
-        for relative in ("skills/code-review", "adapters"):
-            shutil.copytree(ROOT / relative, cls.source / relative,
-                            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        shutil.copytree(ROOT / "skills/code-review", cls.source / "skills/code-review",
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         (cls.source / "scripts").mkdir()
         shutil.copyfile(ROOT / "scripts/install.py", cls.source / "scripts/install.py")
         marker = cls.source / "skills/code-review/fixture-version"
@@ -79,9 +78,8 @@ class RemoteInstallerTests(unittest.TestCase):
         self.assertTrue(json.loads(result.stdout)["ok"])
         skill = self.project / ".agents/skills/code-review"
         self.assertEqual((skill / "fixture-version").read_text(), "selected release")
-        # A local Windows checkout may use CRLF; the download preserves Git's LF.
-        self.assertEqual((self.project / ".codex/agents/reviewer.toml").read_text(encoding="utf-8"),
-                         (ROOT / "adapters/codex/reviewer.toml").read_text(encoding="utf-8"))
+        self.assertFalse((self.project / ".codex").exists())
+        self.assertFalse((self.project / ".claude").exists())
         self.assertFalse((self.project / "code-review-skill").exists())
 
     def test_both_hosts_and_explicit_project_path(self):
@@ -90,9 +88,9 @@ class RemoteInstallerTests(unittest.TestCase):
         result = self.install("--agent", "both", "--project", str(destination))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((destination / ".claude/skills/code-review/SKILL.md").is_file())
-        self.assertTrue((destination / ".claude/agents/reviewer.md").is_file())
         self.assertTrue((destination / ".agents/skills/code-review/SKILL.md").is_file())
-        self.assertTrue((destination / ".codex/agents/reviewer.toml").is_file())
+        self.assertFalse((destination / ".claude/agents").exists())
+        self.assertFalse((destination / ".codex").exists())
         self.assertEqual(list(self.project.iterdir()), [])
 
     def test_dry_run_does_not_install(self):
@@ -102,18 +100,18 @@ class RemoteInstallerTests(unittest.TestCase):
         self.assertEqual(list(self.project.iterdir()), [])
 
     def test_conflict_exit_and_force_backup_survive_remote_entry(self):
-        adapter = self.project / ".codex/agents/reviewer.toml"
-        adapter.parent.mkdir(parents=True)
-        adapter.write_text("custom reviewer", encoding="utf-8")
+        skill = self.project / ".agents/skills/code-review"
+        skill.mkdir(parents=True)
+        (skill / "custom.txt").write_text("custom skill", encoding="utf-8")
         result = self.install("--agent", "codex")
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertEqual(adapter.read_text(), "custom reviewer")
-        self.assertFalse((self.project / ".agents").exists())
+        self.assertEqual((skill / "custom.txt").read_text(), "custom skill")
+        self.assertFalse((self.project / ".claude").exists())
         result = self.install("--agent", "codex", "--force")
         self.assertEqual(result.returncode, 0, result.stderr)
-        backups = list(adapter.parent.glob("reviewer.toml.bak.*"))
+        backups = list(skill.parent.glob("code-review.bak.*"))
         self.assertEqual(len(backups), 1)
-        self.assertEqual(backups[0].read_text(), "custom reviewer")
+        self.assertEqual((backups[0] / "custom.txt").read_text(), "custom skill")
 
     def test_failed_download_leaves_project_untouched(self):
         result = self.install("--agent", "codex", repository=self.directory / "missing.git")

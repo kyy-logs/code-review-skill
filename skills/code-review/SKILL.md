@@ -15,10 +15,6 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
   或直接用实际绝对路径替换；不要假定不同 shell 调用会保留变量。
 - 脚本需要 Bash、Git、awk、grep、sed 等基础命令。通过 `bash` 调用，无需依赖可执行位。
 - 报告解析需要 Python 3.9+ 和 PyYAML；默认调用 `python`，可用 `CODE_REVIEW_PYTHON` 指定解释器绝对路径。
-- 独立 reviewer 的完整说明在 `references/reviewer.md`。安装与派发按宿主：
-  - Claude Code：skill 在 `.claude/skills/code-review/`，适配器在 `.claude/agents/reviewer.md`，派发 `subagent_type: reviewer`。
-  - Codex：skill 在 `.agents/skills/code-review/`，适配器在 `.codex/agents/reviewer.toml`，以自定义 agent `reviewer` 派发（`agent_type: reviewer`）。
-  - 其他宿主：须提供独立上下文能力；无法提供时记录限制，不得伪造裁决。
   安装方式见发布仓库 README；仓库内入口为 `scripts/install.py`。
 
 ## 适用范围
@@ -67,7 +63,7 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
      需要旧版本时读取 base。文件扫描仅使用与目标版本一致的磁盘文件。
 
    **记录并交接**：保存模式、base、目标（工作区或 head）、变更文件清单及差异，
-   供所有探针和 reviewer 使用。程序处理文件清单时使用 NUL 分隔，并逐路径引用传参。
+   供所有探针使用。程序处理文件清单时使用 NUL 分隔，并逐路径引用传参。
 
    收集完成后，再创建报告目录 `docs/work/active/{slug}/probes/`，
    避免将新生成的报告纳入待审查文件。
@@ -79,11 +75,12 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
 
 3. **并行执行探针**：
 
-   **派发**：主执行器按注册表为每个探针派发独立代理，提供审查范围、diff、项目根、skill 路径及该探针的输入和 `params`，并在派发提示中包含本步骤“执行”段的公共约束。
+   **派发**：主执行器按注册表为每个探针派发独立代理，提供审查范围、diff、项目根、skill 路径及该探针的输入和 `params`，并在派发提示中包含上文“执行边界”和本步骤“执行”段的公共约束。
    代理读取注册项 `file` 指向的说明和输出契约，按参数执行。
    并发槽位不足时分批执行；没有独立代理能力时串行执行并记录限制。
 
    **执行**：代理只检查自己的探针，不重跑完整流程或再派发代理；源码版本遵循步骤 1。
+   finding 须说明本次改动如何引入或触发该问题；无关的存量问题单独说明，不纳入本轮 finding 清单及计数。
    复用已读上下文，仅按需补读；独立只读查询尽量合并，有依赖的查询逐步执行，首次读取源码时保留准确行号和必要上下文。
    本地搜索限于被审仓库、明确提供的关联目录及依赖坐标对应的缓存路径；缺失或不可读时记录具体证据缺口，
    不扩大到磁盘根目录或用户目录，也不在没有新线索时反复搜索。
@@ -102,26 +99,8 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug} --probes
    ```
 
-4. **裁决（按 `reviewer` 配置）**：
-
-   运行：
-   ```bash
-   DECISION="$(bash "$CODE_REVIEW_SKILL_DIR/scripts/review-mode" {slug} --base <base>)"
-   ```
-   - `run` → 用宿主的独立上下文工具派发 reviewer，执行 `references/reviewer.md`：
-     - Claude Code：`subagent_type: reviewer`（`.claude/agents/reviewer.md`）。
-     - Codex：自定义 agent `reviewer`（`.codex/agents/reviewer.toml`，`agent_type: reviewer`）。
-     - 其他宿主：按宿主机制提供独立上下文；无法提供时记录限制。
-   - `skip reason=...` → 不派发，在产物目录的 `reviewer.json` 记录 decision、reason 和空数组。
-
-   派发时提供 skill 路径、项目根、`{slug}`、产物目录、审查模式、base、目标（工作区或 head）、
-   变更文件清单及差异，并明确按“确定审查范围”中约定的方式读取源码。
-
-   返回的 JSON **原样**保存到 `reviewer.json`，复核补充说明写入报告 §6 的非自动区域；
-   未完成裁决的 finding 保持原判及 `status=open`，不得代补裁决。
-
-5. **reconciliation 完整性检查**：
-   从探针 JSON 和 `reviewer.json` 自动派生最终计数：
+4. **reconciliation 完整性检查**：
+   从探针 JSON 自动派生最终计数：
    ```bash
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug}
    ```
@@ -129,7 +108,7 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
    有未处置问题（`RECONCILE_PENDING > 0`）时，本轮仍交付报告并列明阻塞项，不得推进合入。
    后续修复任务完成后，再复审受影响的部分；重派上限见 `references/probes.yaml` 的 `execution.max_retry`。
 
-6. **汇总报告**：按输出契约汇总 findings、未验证项及阻塞结论。
+5. **汇总报告**：按输出契约汇总 findings、未验证项及阻塞结论。
    若提供了验收标准，须先按“可选收尾”完成勾验，再形成最终结论。
    按模板撰写范围、解释、修复建议和限制，保留自动区域标记；原始 JSON 不写入正文。
    执行以下命令直接生成事实区域并校验，不经模型复制表格：
@@ -146,22 +125,21 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
 | 阻塞条件 | 后续动作 |
 |---|---|
 | required 探针为 `failed` / `error`（`PROBE_REQUIRED_FAILED > 0`） | 处理已发现的问题或执行错误后，重跑对应探针 |
-| high finding 未完成 reconciliation（`RECONCILE_PENDING > 0`） | 按步骤 5 处理，修复后重派受影响的探针 |
-| reconcile 从未上报（`RECONCILE_REPORTED=0`） | 完成步骤 5；没有 high 也须执行最终同步 |
-| `reviewer.policy=strict` 且 decision=`skip`，同时存在 open 的 high | 按步骤 4 处理，未处置的 finding 不得放行 |
+| high finding 未完成 reconciliation（`RECONCILE_PENDING > 0`） | 按步骤 4 处理，修复后重派受影响的探针 |
+| reconcile 从未上报（`RECONCILE_REPORTED=0`） | 完成步骤 4；没有 high 也须执行最终同步 |
 | 提供了覆盖率数据且低于基线（默认增量行覆盖率 < 85%） | 列明覆盖缺口，补测试后重新审查 |
 | 提供了验收标准且未全过，或标准本身有歧义 | 列明未通过项；有歧义先澄清，不得自行勾验通过 |
 | 有 high finding 停在 `wontfix` | 按输出契约完成处置，不能用“不修”冲抵待办 |
 
 执行状态与输入错误的判定见 `references/output-schema.md` 第 4 节。
 
-脚本验证报告记录与计数的一致性，不能证明检查是否充分或 reviewer 是否实际派发。
+脚本验证报告记录与计数的一致性，不能证明检查是否充分。
 
 ## 输出契约
 
 - **主报告**：`docs/work/active/{slug}/code-review.md`，按
   `assets/code-review.md` 的章节和填写要求生成。
-- **机器记录**：`docs/work/active/{slug}/probes/<探针名>.json` 和 `reviewer.json`，
+- **机器记录**：`docs/work/active/{slug}/probes/<探针名>.json`，
   格式见 `references/output-schema.md`；人类报告的事实区域由它们派生。
 
 ## 可选收尾

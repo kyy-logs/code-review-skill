@@ -37,14 +37,12 @@ class BehaviorFixture:
             name: dict(probe=name, status='passed', duration=1, findings=[])
             for name in PROBES
         }
-        self.reviewer = dict(decision='skip', reason='no_findings', verdicts=[], findings=[])
         self.write_records()
 
     def write_records(self):
         for name, record in self.records.items():
             (self.review / 'probes' / (name + '.json')).write_text(
                 json.dumps(record), encoding='utf-8')
-        (self.review / 'reviewer.json').write_text(json.dumps(self.reviewer), encoding='utf-8')
 
     def add_high(self):
         self.records['behavior-review'].update(status='failed', findings=[{
@@ -54,7 +52,6 @@ class BehaviorFixture:
             'evidence': 'With priority set and visibility omitted, fall-through writes false; '
                         'the parser contract requires visibility to retain its default.'
         }])
-        self.reviewer = dict(decision='run', verdicts=[], findings=[])
         self.write_records()
 
     def helper(self, *args):
@@ -93,28 +90,6 @@ class BehaviorRecordsTests(BehaviorFixture, unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(result.stdout, '')
 
-    def test_reviewer_applies_to_behavior_ids_without_rewriting_probe_evidence(self):
-        self.add_high()
-        original = (self.review / 'probes/behavior-review.json').read_bytes()
-        for verdict, severity, status, counts in (
-            ('confirmed', 'high', 'open', dict(total=1, done=0, pending=1)),
-            ('unverified', 'high', 'open', dict(total=1, done=0, pending=1)),
-            ('rejected', 'high', 'false-positive', dict(total=1, done=1, pending=0)),
-            ('downgraded', 'medium', 'open', dict(total=0, done=0, pending=0)),
-        ):
-            with self.subTest(verdict=verdict):
-                self.reviewer['verdicts'] = [dict(
-                    id='behavior-review-1', verdict=verdict, severity=severity,
-                    evidence='Checked the actual parser implementation and target contract.')]
-                self.write_records()
-                result = self.summary()
-                self.assertEqual(result['reconcile'], counts)
-                self.assertEqual(len(result['findings']), 1)
-                self.assertEqual(result['findings'][0]['severity'], severity)
-                self.assertEqual(result['findings'][0]['status'], status)
-                self.assertEqual(result['probes'][0]['high'], 1)
-                self.assertEqual((self.review / 'probes/behavior-review.json').read_bytes(), original)
-
     def test_rule_probe_error_preserves_behavior_finding_and_other_records(self):
         self.add_high()
         self.records['repo-guard'].update(status='error', reason='Selected rules are unreadable')
@@ -124,11 +99,8 @@ class BehaviorRecordsTests(BehaviorFixture, unittest.TestCase):
         self.assertEqual(result['findings'][0]['id'], 'behavior-review-1')
         self.assertEqual(result['reconcile'], dict(total=1, done=0, pending=1))
 
-    def test_report_renders_behavior_finding_and_verdict_and_preserves_narrative(self):
+    def test_report_renders_behavior_finding_and_preserves_narrative(self):
         self.add_high()
-        self.reviewer['verdicts'] = [dict(
-            id='behavior-review-1', verdict='confirmed', severity='high', evidence='Verified path.')]
-        self.write_records()
         path = self.review / 'code-review.md'
         path.write_text(path.read_text(encoding='utf-8') + '\nSupplement for behavior-review-1.\n',
                         encoding='utf-8')
@@ -137,12 +109,22 @@ class BehaviorRecordsTests(BehaviorFixture, unittest.TestCase):
         report = path.read_text(encoding='utf-8')
         self.assertIn('behavior-review', report)
         self.assertIn('behavior-review-1', report)
-        self.assertIn('confirmed', report)
         self.assertIn('total=1 / done=0 / pending=1', report)
         self.assertTrue(report.endswith('Supplement for behavior-review-1.\n'))
         self.assertEqual(self.helper('--check-report').returncode, 0)
         path.write_text(report.replace('behavior-review-1', 'behavior-review-9'), encoding='utf-8')
         self.assertNotEqual(self.helper('--check-report').returncode, 0)
+
+    def test_legacy_reviewer_region_requires_removal(self):
+        path = self.review / 'code-review.md'
+        legacy = path.read_text(encoding='utf-8') + (
+            chr(10) + '<!-- code-review:reviewer:start -->' + chr(10) + 'old verdict' + chr(10)
+            + '<!-- code-review:reviewer:end -->' + chr(10))
+        path.write_text(legacy, encoding='utf-8')
+        result = self.helper('--write-report')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('旧版 Reviewer', result.stderr)
+        self.assertEqual(path.read_text(encoding='utf-8'), legacy)
 
     def test_historical_three_probe_run_still_uses_its_frozen_registry(self):
         configuration = yaml.safe_load(self.registry.read_text(encoding='utf-8'))

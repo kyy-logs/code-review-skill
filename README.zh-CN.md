@@ -4,7 +4,7 @@
 
 **基于证据的代码审查：优先静态分析，使用探针分工，并根据结果执行门禁。**
 
-技能源码位于 [`skills/code-review/`](skills/code-review/)，与宿主工具的安装目录分离。仓库在 [`adapters/`](adapters/) 中提供 Claude Code 和 Codex 的 reviewer 适配器。当前为 beta 测试版本，版本号见 [VERSION](VERSION)。
+技能源码位于 [`skills/code-review/`](skills/code-review/)，与宿主工具的安装目录分离。当前为 beta 测试版本，版本号见 [VERSION](VERSION)。
 
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-6B4FBB?style=flat-square)](https://claude.com/claude-code)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-standard-1f6feb?style=flat-square)](https://agentskills.io)
@@ -16,6 +16,16 @@
 审查过程不会修改被审代码。
 
 ## 最新动态
+
+### v0.1.0-beta.3（2026-10-31）
+
+#### 移除
+
+- 移除独立 reviewer 及其 Claude Code/Codex 适配器。四探针直接根据原始 finding 生成报告和门禁；不再使用 `reviewer.json`、`review-mode` 或 reviewer 适配器安装。
+
+#### 调整
+
+- 安装器现在只安装宿主技能目录；`--agent` 只选择 Claude Code 或 Codex 的 skill 目录。
 
 ### v0.1.0-beta.2（2026-10-31）
 
@@ -42,11 +52,11 @@
 
 ## 发布状态
 
-`v0.1.0-beta.2` 为测试版本。在 1.0 之前，探针契约、报告结构和门禁行为可能调整。
+`v0.1.0-beta.3` 为测试版本。在 1.0 之前，探针契约、报告结构和门禁行为可能调整。
 
 - **三级评级**：`high`、`medium`、`low`。此前四级版本写入的记录，包括包含 `critical` 值的记录，**不兼容**当前版本；`collect-metrics` 会拒绝这些记录。使用前请重新审查，或显式迁移记录。
-- **适用范围**：以静态分析为主，使用四个探针、可选的独立 reviewer，以及从 JSON 派生的报告和门禁。不能替代测试、CI 或人工审查。
-- **验证情况**：50 项审查流程、NEWS 与安装离线测试；干净项目中包含 reviewer 和阻塞门禁的端到端验证；额外的探针与 reviewer 冒烟验证。这些属于回归检查，不能据此宣称具备通用召回能力。并发缺陷识别尚未验证。
+- **适用范围**：以静态分析为主，使用四个探针，以及从 JSON 派生的报告和门禁。不能替代测试、CI 或人工审查。
+- **验证情况**：49 项审查流程、NEWS 与安装离线测试；干净项目中的端到端门禁验证；额外的探针冒烟验证。这些属于回归检查，不能据此宣称具备通用召回能力。并发缺陷识别尚未验证。
 
 ## 目录
 
@@ -57,7 +67,6 @@
 - [工作流程](#工作流程)
 - [证据契约](#证据契约)
 - [配置](#配置)
-- [独立复核](#独立复核)
 - [能力边界](#能力边界)
 - [验证情况](#验证情况)
 - [运行环境](#运行环境)
@@ -72,7 +81,6 @@
 | **优先静态分析** | 新克隆的仓库或不完整检出也能审查。覆盖率数据可选，不作为前置条件。 |
 | **证据契约** | 每条问题必须有位置、摘要和可核对的证据。 |
 | **四个探针分工** | 分别检查行为、测试、规范和影响，各自产出独立记录。 |
-| **独立 reviewer** | 可选的第二个上下文只读取冻结输入和原始发现，不读取预设答案。 |
 | **可由脚本检查的门禁** | 计数和阻塞项由 JSON 派生。 |
 | **可核对的输出** | 人读报告和 JSON 使用同一份数据，并检查两者是否一致。 |
 
@@ -80,9 +88,9 @@
 
 ### 安装
 
-源码仓库把可移植技能放在 `skills/code-review/`；安装器会把技能和对应宿主的 reviewer 适配器复制到使用方项目。默认不覆盖已有文件。
+源码仓库把可移植技能放在 `skills/code-review/`；安装器会把技能复制到使用方项目。默认不覆盖已有文件。
 
-**在你的项目目录中**执行下面一条命令，同时安装 skill 和 Codex reviewer：
+**在你的项目目录中**执行下面一条命令，安装 Codex 使用的 skill：
 
 ```bash
 python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/main/scripts/install-remote.py', timeout=30).read())" --agent codex
@@ -106,18 +114,18 @@ bash scripts/install --agent codex --project /path/to/your-project
 
 宿主目录：
 
-| 宿主 | 技能 | Reviewer 适配器 | 派发方式 |
-|---|---|---|---|
-| Claude Code | `.claude/skills/code-review/` | `.claude/agents/reviewer.md` | `subagent_type: reviewer` |
-| Codex | `.agents/skills/code-review/` | `.codex/agents/reviewer.toml` | 自定义 agent `reviewer`（`agent_type: reviewer`） |
+| 宿主 | 技能目录 |
+|---|---|
+| Claude Code | `.claude/skills/code-review/` |
+| Codex | `.agents/skills/code-review/` |
 
 `--agent` 可取 `claude-code`、`codex` 或 `both`。已有文件默认受保护：安装器会列出冲突并以非零状态退出；`--force` 才会替换，并先备份为带时间戳的 `.bak`。`--dry-run` 只打印计划。安装器不会修改 `.codex/config.toml` 或其他 agent 配置。
 
-`npx -y skills add ... --agent codex --yes` 只安装技能，不安装 reviewer 适配器；需要独立 reviewer 时使用上面的安装器。Node.js 22.20+ 仅用于这个可选的 `npx` 路径。
+`npx -y skills add ... --agent codex --yes` 只安装技能。Node.js 22.20+ 仅用于这个可选的 `npx` 路径。
 
-其他宿主需要把 `skills/code-review/` 安装到其技能目录，并提供独立上下文机制；本仓库只提供 Claude Code 和 Codex 适配器。
+其他宿主需要把 `skills/code-review/` 安装到其技能目录；本仓库只提供 Claude Code 和 Codex 的目录布局。
 
-完整工作流需要同时安装技能和适配器：只安装技能不会注册独立 reviewer。先安装[运行环境](#运行环境)中列出的依赖。如果 Python 无法导入 PyYAML，请在技能使用的解释器中执行 `python -m pip install PyYAML`；也可以通过 `CODE_REVIEW_PYTHON` 指定其他解释器。
+安装器只复制技能。先安装[运行环境](#运行环境)中列出的依赖。如果 Python 无法导入 PyYAML，请在技能使用的解释器中执行 `python -m pip install PyYAML`；也可以通过 `CODE_REVIEW_PYTHON` 指定其他解释器。
 
 ### 运行
 
@@ -149,7 +157,6 @@ bash scripts/install --agent codex --project /path/to/your-project
 ```text
 docs/work/active/{slug}/
 ├── code-review.md      # 人读报告
-├── reviewer.json       # 独立 reviewer 裁决（可选）
 └── probes/
     ├── behavior-review.json
     ├── test-coverage.json
@@ -160,16 +167,15 @@ docs/work/active/{slug}/
 ## 工作流程
 
 ```text
-确定范围 ──► 探针检查 ──► 同步 ──► 独立复核（可选） ──► 对账 ──► 报告 ──► 门禁
+确定范围 ──► 探针检查 ──► 同步 ──► 对账 ──► 报告 ──► 门禁
 ```
 
 1. **确定范围**：选择 `worktree` 或 `commits`，将 base 和 head 记录为 commit ID。
 2. **探针检查**：派发四个独立代理，使用同一份范围和 diff，各自写自己的探针 JSON。宿主槽位不足时分批执行；没有代理能力时记录串行回退。跨探针重复问题暂时保留并计数，实际提速和 token 节省尚未验证。
 3. **同步**：使用 `collect-metrics` 校验探针 JSON 并计算数量。
-4. **独立复核（可选）**：仅在 `review-mode` 返回 `run` 时派发 reviewer。
-5. **对账**：high 问题需要关闭，或由复核明确驳回。
-6. **报告**：从 JSON 生成人读报告的事实区，再校验展示内容。
-7. **门禁**：必需探针失败、存在未处理的 high 问题时，阻塞合并。
+4. **对账**：high 问题需要关闭，或被 probe 标为误报。
+5. **报告**：从 JSON 生成人读报告的事实区，再校验展示内容。
+6. **门禁**：必需探针失败、存在未处理的 high 问题时，阻塞合并。
 
 ### 四个探针
 
@@ -198,16 +204,7 @@ high 问题必须引用实际方法签名及违反的契约，或给出具体代
 
 ## 配置
 
-`references/probes.yaml` 管理探针注册和 reviewer 策略：
-
-```yaml
-reviewer:
-  mode: auto        # auto | always | never
-  skip_when:
-    - no_findings
-    - only_docs
-  policy: strict    # strict | advisory
-```
+`references/probes.yaml` 管理探针注册：
 
 项目规范可以放在 `.code-review/rules/` 中，也可以通过 `CODE_REVIEW_RULES_DIR` 指定：
 
@@ -216,12 +213,6 @@ export CODE_REVIEW_RULES_DIR=/path/to/rules
 ```
 
 项目规则包会**替换**内置规则包，两者不会合并。
-
-## 独立复核
-
-`skills/code-review/references/reviewer.md` 是与宿主无关的 reviewer 指令。`adapters/claude-code/reviewer.md` 是 Claude Code 适配器（安装到 `.claude/agents/reviewer.md`）；`adapters/codex/reviewer.toml` 是 Codex 自定义 agent 定义（安装到 `.codex/agents/reviewer.toml`）。两个适配器只负责宿主路由，都指回同一份 reviewer 指令。
-
-reviewer 读取冻结的技能、案例输入和原始探针结果，不读取参考评论、预期答案或历史报告。宿主无法提供全新上下文时，需要记录这一限制，不得编造复核裁决。
 
 ## 能力边界
 
@@ -236,7 +227,7 @@ reviewer 读取冻结的技能、案例输入和原始探针结果，不读取�
 <summary>11 个历史 Java 案例回归（2026-10-29）</summary>
 
 - 基线为 `494a39bb`，当时尚未将 `behavior-review` 拆为独立探针。本快照验证共享的问题记录和门禁契约，不代表已验证四探针拆分。
-- 11/11 案例完成；关闭 reviewer；采用静态审查。
+- 11/11 案例完成；采用静态审查。
 - 原始行为目标命中 5/5；纳入另外两个独立确认的边界缺陷后，应报目标合计命中 5/7。
 - 正常与修复对照 4/4 通过，未发生错误阻塞。
 - 存在两项确认漏报：解析器的合法输入格式，以及命令渲染中的 JSON 表示往返转换。
@@ -296,18 +287,13 @@ code-review-skill/
 │       ├── references/
 │       │   ├── probes.yaml
 │       │   ├── output-schema.md
-│       │   ├── reviewer.md
 │       │   ├── probes/
 │       │   └── rules/
 │       └── scripts/
-│           ├── review-mode
 │           ├── collect-metrics
 │           ├── lib-metrics
 │           ├── rule-grep
 │           └── sync-results.py
-├── adapters/
-│   ├── claude-code/reviewer.md
-│   └── codex/reviewer.toml
 └── tests/
 ```
 

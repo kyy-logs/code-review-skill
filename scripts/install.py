@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the code-review skill and its host adapter into a project.
+"""Install the code-review skill into a project.
 
 The installer is intentionally conservative: it plans every target before
 writing, treats identical files as already installed, and refuses to overwrite
@@ -21,18 +21,12 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 SOURCE_SKILL = REPO / "skills" / "code-review"
-ADAPTERS = {
-    "claude-code": REPO / "adapters" / "claude-code" / "reviewer.md",
-    "codex": REPO / "adapters" / "codex" / "reviewer.toml",
-}
 TARGETS = {
     "claude-code": (
         ("skill", SOURCE_SKILL, ".claude/skills/code-review", True),
-        ("adapter", ADAPTERS["claude-code"], ".claude/agents/reviewer.md", False),
     ),
     "codex": (
         ("skill", SOURCE_SKILL, ".agents/skills/code-review", True),
-        ("adapter", ADAPTERS["codex"], ".codex/agents/reviewer.toml", False),
     ),
 }
 IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc")
@@ -162,9 +156,9 @@ def _apply(project: Path, actions: list[dict]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Install code-review and its reviewer adapter.")
+    parser = argparse.ArgumentParser(description="Install the code-review skill.")
     parser.add_argument("--agent", required=True, choices=("claude-code", "codex", "both"),
-                        help="host adapter to install")
+                        help="host skill layout to install")
     parser.add_argument("--project", default=os.getcwd(), help="target project root (default: cwd)")
     parser.add_argument("--force", action="store_true",
                         help="replace existing different files, keeping a timestamped backup")

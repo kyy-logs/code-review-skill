@@ -14,7 +14,6 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'skills/code-review'
-ADAPTER = ROOT / 'adapters/claude-code/reviewer.md'
 
 
 class PortableInstallationTests(unittest.TestCase):
@@ -32,10 +31,6 @@ class PortableInstallationTests(unittest.TestCase):
     def install(self, relative):
         self.skill = self.project / relative
         shutil.copytree(SOURCE, self.skill, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-        adapter = self.project / '.claude/agents/reviewer.md'
-        adapter.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ADAPTER, adapter)
-        self.assertEqual(adapter.read_bytes(), ADAPTER.read_bytes())
         registry = yaml.safe_load((self.skill / 'references/probes.yaml').read_text(encoding='utf-8'))
         self.records = {p['name']: dict(probe=p['name'], status='passed', findings=[]) for p in registry['probes']}
         shutil.copyfile(self.skill / 'assets/code-review.md', self.review / 'code-review.md')
@@ -44,8 +39,6 @@ class PortableInstallationTests(unittest.TestCase):
     def write_records(self):
         for name, record in self.records.items():
             (self.review / 'probes' / (name + '.json')).write_text(json.dumps(record), encoding='utf-8')
-        (self.review / 'reviewer.json').write_text(json.dumps(dict(
-            decision='skip', reason='no_findings', verdicts=[], findings=[])), encoding='utf-8')
 
     def run_python(self, *args):
         return subprocess.run([sys.executable, '-X', 'utf8', str(self.skill / 'scripts/sync-results.py'),
@@ -88,9 +81,6 @@ class PortableInstallationTests(unittest.TestCase):
                      ('sync', 'example', '--probes'), ('gate-pass', 'example', 'code-review')):
             result = command('collect-metrics', *args)
             self.assertEqual(result.returncode, 0, result.stderr)
-        result = command('review-mode', 'example', '--base', 'HEAD')
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('skip reason=no_findings', result.stdout)
 
         self.records['behavior-review'].update(status='failed', findings=[dict(
             id='behavior-review-1', probe='behavior-review', severity='high', status='open',
@@ -98,9 +88,6 @@ class PortableInstallationTests(unittest.TestCase):
             evidence='A valid input now fails at the public parser boundary.')])
         self.write_records()
         self.assertEqual(command('collect-metrics', 'render-report', 'example').returncode, 0)
-        result = command('review-mode', 'example', '--base', 'HEAD')
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), 'run')
         self.assertNotEqual(command('collect-metrics', 'gate-pass', 'example', 'code-review').returncode, 0)
 
         rules = self.project / '.code-review/rules'
