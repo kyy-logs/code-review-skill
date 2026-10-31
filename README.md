@@ -10,6 +10,7 @@ The skill source lives in [`skills/code-review/`](skills/code-review/), independ
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-standard-1f6feb?style=flat-square)](https://agentskills.io)
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Static-first](https://img.shields.io/badge/review-static--first-2ea44f?style=flat-square)](#what-this-is-not)
+[![GitHub stars](https://img.shields.io/github/stars/kyy-logs/code-review-skill?style=flat-square&logo=github)](https://github.com/kyy-logs/code-review-skill/stargazers)
 
 Most AI reviews stop at “this looks risky.” This skill produces a review you can audit: every finding points to a location, a contract or code path, and a severity; every gate decision is rendered from machine-readable JSON. It reads the diff, surrounding source, tests, and project rules — no build, test run, or coverage report required.
 
@@ -262,6 +263,10 @@ code-review-skill/
 │           └── sync-results.py
 └── tests/
 ```
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=kyy-logs/code-review-skill&type=Date)](https://star-history.com/#kyy-logs/code-review-skill&Date)
 
 ## Contributing
 

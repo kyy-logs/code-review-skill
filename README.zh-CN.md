@@ -10,6 +10,7 @@
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-standard-1f6feb?style=flat-square)](https://agentskills.io)
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![静态分析优先](https://img.shields.io/badge/review-static--first-2ea44f?style=flat-square)](#能力边界)
+[![GitHub stars](https://img.shields.io/github/stars/kyy-logs/code-review-skill?style=flat-square&logo=github)](https://github.com/kyy-logs/code-review-skill/stargazers)
 
 许多 AI 审查只给出“这里可能有风险”的判断。这个 skill 生成可核对的审查结果：每条问题都有位置、契约或代码路径依据，以及严重级别；门禁结论由机器可读的 JSON 派生。审查会读取 diff、相关源码、测试和项目规范，无须先构建项目、运行测试或生成覆盖率报告。
 
@@ -265,6 +266,10 @@ code-review-skill/
 │           └── sync-results.py
 └── tests/
 ```
+
+## Star 趋势
+
+[![Star History Chart](https://api.star-history.com/svg?repos=kyy-logs/code-review-skill&type=Date)](https://star-history.com/#kyy-logs/code-review-skill&Date)
 
 ## 参与贡献
 
