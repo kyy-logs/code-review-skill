@@ -88,44 +88,13 @@
 
 ### 安装
 
-源码仓库把可移植技能放在 `skills/code-review/`；安装器会把技能复制到使用方项目。默认不覆盖已有文件。
-
-**在你的项目目录中**执行下面一条命令，安装 Codex 使用的 skill：
+**在你的项目目录中**执行：
 
 ```bash
-python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/main/scripts/install-remote.py', timeout=30).read())" --agent codex
+npx -y skills add kyy-logs/code-review-skill --agent codex --skill code-review --yes
 ```
 
-命令末尾可追加 `--dry-run` 预览、`--project "你的项目路径"` 指定其他项目，或 `--ref <分支或标签>` 选择包含安装器的源码版本。远程入口默认使用 `main`；可用 `--ref` 选择其他分支或标签。
-
-如果已经有本地源码仓库：
-
-```bash
-git clone --branch main https://github.com/kyy-logs/code-review-skill.git
-cd code-review-skill
-python scripts/install.py --agent both --project /path/to/your-project
-```
-
-也可以使用 shell 包装：
-
-```bash
-bash scripts/install --agent codex --project /path/to/your-project
-```
-
-宿主目录：
-
-| 宿主 | 技能目录 |
-|---|---|
-| Claude Code | `.claude/skills/code-review/` |
-| Codex | `.agents/skills/code-review/` |
-
-`--agent` 可取 `claude-code`、`codex` 或 `both`。已有文件默认受保护：安装器会列出冲突并以非零状态退出；`--force` 才会替换，并先备份为带时间戳的 `.bak`。`--dry-run` 只打印计划。安装器不会修改 `.codex/config.toml` 或其他 agent 配置。
-
-`npx -y skills add ... --agent codex --yes` 只安装技能。Node.js 22.20+ 仅用于这个可选的 `npx` 路径。
-
-其他宿主需要把 `skills/code-review/` 安装到其技能目录；本仓库只提供 Claude Code 和 Codex 的目录布局。
-
-安装器只复制技能。先安装[运行环境](#运行环境)中列出的依赖。如果 Python 无法导入 PyYAML，请在技能使用的解释器中执行 `python -m pip install PyYAML`；也可以通过 `CODE_REVIEW_PYTHON` 指定其他解释器。
+Claude Code 使用 `--agent claude-code`。Codex 安装到 `.agents/skills/code-review/`，Claude Code 安装到 `.claude/skills/code-review/`。需要 Node.js 22.20+。只安装 skill，不再安装独立 reviewer。
 
 ### 运行
 
@@ -259,8 +228,8 @@ export CODE_REVIEW_RULES_DIR=/path/to/rules
 
 - 支持 Agent Skills 的 Claude Code，或支持自定义 agent 的 Codex。
 - Bash、Git、awk、grep、sed。
-- Python 3.9+；安装仅使用标准库。运行审查脚本时还需要 PyYAML，用于报告解析和指标处理。
-- Node.js 22.20+ 仅在使用可选的 `npx skills` 只装技能快捷方式时需要。
+- 运行审查脚本需要 Python 3.9+；PyYAML 用于报告解析和指标处理。
+- `npx skills` 安装入口需要 Node.js 22.20+。
 
 ## 仓库结构
 
