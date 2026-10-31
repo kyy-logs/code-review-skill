@@ -1,10 +1,10 @@
-# code-review 探针注册表：维护执行顺序、依赖和参数。
+# code-review 探针注册表：维护探针清单、依赖和参数。
 # required / requires 及执行状态的含义见 references/output-schema.md 第 4 节。
 
 version: 1
 
 execution:
-  mode: sequential
+  mode: parallel
   max_retry: 1              # reconciliation 发现遗漏时重派的次数上限
 
 # scripts/review-mode 判断是否派发：always 总派，never 不派，auto 按 skip_when 决定。

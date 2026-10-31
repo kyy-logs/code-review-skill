@@ -18,38 +18,35 @@ It never modifies the code under review.
 ## Latest news
 
 <!-- NEWS:START -->
-### v0.1.0-beta (2026-10-30)
+### v0.1.0-beta.2 (2026-10-31)
 
 #### Added
 
-- Four review probes: behavior correctness, test coverage, repository rules,
-  and impact analysis.
-- Portable skill source in `skills/code-review/`, with separate Claude Code
-  and Codex reviewer adapters in `adapters/`.
-- JSON-derived report sections and merge gates, with an optional independent
-  reviewer.
-- A unified installer for `claude-code`, `codex`, or both, with dry-run,
-  conflict protection, and timestamped backups under `--force`.
+- Parallel four-probe execution: each probe gets a fresh agent and writes its
+  own JSON; hosts without four slots run in batches or record a serial fallback.
+- Automatic NEWS unreleased updates and one-command remote skill installation.
 
 #### Changed
 
-- Severity now uses three levels: `high`, `medium`, and `low`. Earlier
-  four-level records require an explicit migration or a new review.
-- Findings that depend on an unresolved contract conflict are capped at
-  `medium` and marked as requiring contract confirmation.
+- Probe dispatch now includes bounded local-search and background-task cleanup
+  rules, and `behavior-review` starts from the diff and stops when evidence is
+  sufficient.
+- `test-coverage` hands valid measured coverage back to the main executor;
+  cross-probe duplicates remain separate records until a later deduplication
+  design is adopted.
 
-#### Packaging
+#### Fixed
 
-- Added an MIT license, version file, and offline regression tests.
-- Internal design documents and evaluation artifacts stay outside the
-  published tree.
+- `behavior-review` now checks asynchronous completion, exception, and
+  cancellation cleanup paths and distinguishes a cancel notification from the
+  task actually stopping.
 
 [Full update history](NEWS.md)
 <!-- NEWS:END -->
 
 ## Release status
 
-`v0.1.0-beta` — this is a test release. The probe contract, report schema, and
+`v0.1.0-beta.2` — this is a test release. The probe contract, report schema, and
 gate behavior may change before 1.0.
 
 - **Severity is three levels:** `high`, `medium`, `low`. Records written by the
@@ -101,17 +98,17 @@ The repository keeps the portable skill in `skills/code-review/`; installation c
 Run this command **inside your project** to install the skill and Codex reviewer together:
 
 ```bash
-python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/feat/behavior-review-probe/scripts/install-remote.py', timeout=30).read())" --agent codex
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/main/scripts/install-remote.py', timeout=30).read())" --agent codex
 ```
 
 Requires Python 3.9+ and Git on `PATH`; use `python3` if that is your Python command. Replace `codex` with `claude-code` or `both` to select another host. The entry downloads this feature branch into a temporary directory, runs the installer, and removes the checkout afterward. You do not need to clone or enter this repository yourself.
 
-Append `--dry-run` to preview, `--project "/path/to/your-project"` to choose another project, or `--ref <branch-or-tag>` to select a source version that includes the installer. Until this change is merged, the remote entry and its default source are on `feat/behavior-review-probe`.
+Append `--dry-run` to preview, `--project "/path/to/your-project"` to choose another project, or `--ref <branch-or-tag>` to select a source version that includes the installer. The remote entry defaults to `main`; use `--ref` to select another branch or tag.
 
 For a local checkout:
 
 ```bash
-git clone --branch feat/behavior-review-probe https://github.com/kyy-logs/code-review-skill.git
+git clone --branch main https://github.com/kyy-logs/code-review-skill.git
 cd code-review-skill
 python scripts/install.py --agent both --project /path/to/your-project
 ```
@@ -182,7 +179,7 @@ scope ──► probes ──► sync ──► reviewer? ──► reconcile �
 ```
 
 1. **Scope** — determine `worktree` or `commits`; record base and head as commit IDs.
-2. **Probes** — run in registry order by one executor, reusing the same scope and diff.
+2. **Probes** — dispatch four independent agents with the same scope and diff, each writing its own probe JSON. Run in batches if host capacity is limited, or record a serial fallback if agents are unavailable. Cross-probe duplicates are retained and counted; actual speed and token savings remain unverified.
 3. **Sync** — validate probe JSON and derive counts with `collect-metrics`.
 4. **Reviewer (optional)** — dispatch only when `review-mode` returns `run`.
 5. **Reconcile** — high findings must be closed or explicitly rejected.

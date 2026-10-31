@@ -17,30 +17,27 @@
 
 ## 最新动态
 
-### v0.1.0-beta（2026-10-30）
+### v0.1.0-beta.2（2026-10-31）
 
 #### 新增
 
-- 四个审查探针：行为正确性、测试覆盖、仓库规范和影响分析。
-- 技能源码迁移至 `skills/code-review/`，Claude Code 和 Codex 的 reviewer 适配器分别放在 `adapters/` 下。
-- 从 JSON 生成报告事实区和门禁结论，并可启用独立 reviewer。
-- 新增统一安装器，支持 `claude-code`、`codex` 或 `both`；默认不覆盖，支持 dry-run，`--force` 时保留时间戳备份。
+- 四探针并行执行：每个探针使用独立代理并写自己的 JSON；宿主没有四个并发槽位时分批执行，或记录串行回退。
+- 自动 NEWS 未发布更新和单命令远程 skill 安装。
 
 #### 调整
 
-- 严重级别统一为 `high`、`medium`、`low`。此前四级版本的记录需要显式迁移，或重新运行审查。
-- 依赖未消解契约冲突的问题，最高定为 `medium`，并标注“契约待确认”。
+- 探针派发加入本地搜索范围和后台任务收口约束；`behavior-review` 先从 diff 定位，证据足够时停止。
+- `test-coverage` 把有效覆盖率数据交回主执行器；跨探针重复问题暂时保留并计数，后续再评估去重。
 
-#### 发布整理
+#### 修复
 
-- 增加 MIT 许可证、版本文件和离线回归测试。
-- 内部设计文档和评测产物不纳入发布文件。
+- `behavior-review` 补充异步完成、异常和取消收尾路径检查，并区分取消通知与任务实际结束。
 
 [完整更新记录（英文）](NEWS.md)
 
 ## 发布状态
 
-`v0.1.0-beta` 为测试版本。在 1.0 之前，探针契约、报告结构和门禁行为可能调整。
+`v0.1.0-beta.2` 为测试版本。在 1.0 之前，探针契约、报告结构和门禁行为可能调整。
 
 - **三级评级**：`high`、`medium`、`low`。此前四级版本写入的记录，包括包含 `critical` 值的记录，**不兼容**当前版本；`collect-metrics` 会拒绝这些记录。使用前请重新审查，或显式迁移记录。
 - **适用范围**：以静态分析为主，使用四个探针、可选的独立 reviewer，以及从 JSON 派生的报告和门禁。不能替代测试、CI 或人工审查。
@@ -83,17 +80,17 @@
 **在你的项目目录中**执行下面一条命令，同时安装 skill 和 Codex reviewer：
 
 ```bash
-python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/feat/behavior-review-probe/scripts/install-remote.py', timeout=30).read())" --agent codex
+python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/main/scripts/install-remote.py', timeout=30).read())" --agent codex
 ```
 
-需要 Python 3.9+ 和 PATH 中可用的 Git；如果你的 Python 命令是 `python3`，替换开头的 `python` 即可。把 `codex` 改成 `claude-code` 或 `both` 可选择其他宿主。入口会把此功能分支下载到临时目录，调用安装器，结束后清理临时仓库，无须手动克隆或切换目录。
+需要 Python 3.9+ 和 PATH 中可用的 Git；如果你的 Python 命令是 `python3`，替换开头的 `python` 即可。把 `codex` 改成 `claude-code` 或 `both` 可选择其他宿主。入口会把所选 ref 下载到临时目录，调用安装器，结束后清理临时仓库，无须手动克隆或切换目录。
 
-命令末尾可追加 `--dry-run` 预览、`--project "你的项目路径"` 指定其他项目，或 `--ref <分支或标签>` 选择包含安装器的源码版本。合并前，远程入口及默认下载来源均为 `feat/behavior-review-probe`。
+命令末尾可追加 `--dry-run` 预览、`--project "你的项目路径"` 指定其他项目，或 `--ref <分支或标签>` 选择包含安装器的源码版本。远程入口默认使用 `main`；可用 `--ref` 选择其他分支或标签。
 
 如果已经有本地源码仓库：
 
 ```bash
-git clone --branch feat/behavior-review-probe https://github.com/kyy-logs/code-review-skill.git
+git clone --branch main https://github.com/kyy-logs/code-review-skill.git
 cd code-review-skill
 python scripts/install.py --agent both --project /path/to/your-project
 ```
@@ -164,7 +161,7 @@ docs/work/active/{slug}/
 ```
 
 1. **确定范围**：选择 `worktree` 或 `commits`，将 base 和 head 记录为 commit ID。
-2. **探针检查**：由同一个执行器按注册顺序运行探针，复用同一份范围和 diff。
+2. **探针检查**：派发四个独立代理，使用同一份范围和 diff，各自写自己的探针 JSON。宿主槽位不足时分批执行；没有代理能力时记录串行回退。跨探针重复问题暂时保留并计数，实际提速和 token 节省尚未验证。
 3. **同步**：使用 `collect-metrics` 校验探针 JSON 并计算数量。
 4. **独立复核（可选）**：仅在 `review-mode` 返回 `run` 时派发 reviewer。
 5. **对账**：high 问题需要关闭，或由复核明确驳回。
