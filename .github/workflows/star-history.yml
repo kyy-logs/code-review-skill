@@ -1,0 +1,67 @@
+name: Update star history
+
+# Snapshot the star-history SVG into the `star-history` orphan branch.
+# The README points at that branch's raw SVG, so the chart has a fixed
+# schedule and does not depend on a viewer's request to star-history.com.
+on:
+  schedule:
+    # Daily at 03:17 UTC (11:17 Beijing). Avoid :00; scheduled runs can queue.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: star-history
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch star history chart
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          chart="$RUNNER_TEMP/star-history.svg"
+          url="https://api.star-history.com/svg?repos=${REPO}&type=Date"
+          code="$(curl -L -sS -o "$chart" -w '%{http_code}' "$url")"
+          if [ "$code" != "200" ] || ! head -c 200 "$chart" | grep -qi '<svg'; then
+            echo "::warning::star-history returned HTTP $code or a non-SVG body; keeping the previous chart"
+            exit 0
+          fi
+          test -s "$chart"
+
+      - name: Publish chart to star-history branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          chart="$RUNNER_TEMP/star-history.svg"
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          if git ls-remote --exit-code --heads "$remote" star-history >/dev/null 2>&1; then
+            old="$(mktemp -d)"
+            git clone --quiet --depth=1 --branch star-history "$remote" "$old/repo"
+            if cmp -s "$chart" "$old/repo/star-history.svg"; then
+              echo "Star history unchanged; skipping commit."
+              exit 0
+            fi
+          fi
+
+          work="$(mktemp -d)"
+          cp "$chart" "$work/star-history.svg"
+          cd "$work"
+          git init --quiet
+          git checkout --quiet --orphan star-history
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add star-history.svg
+          git commit --quiet -m "chore: update star history [skip ci]"
+          # The branch only contains this generated SVG; replacing it keeps
+          # every scheduled run from growing an unrelated bot history.
+          git push --quiet --force "$remote" HEAD:star-history
+          echo "Published star-history.svg to the star-history branch."
