@@ -170,6 +170,33 @@ def render_sections(summary):
     return dict(probes='\n'.join(rows).strip(), gate=gate)
 
 
+def summary_text(summary):
+    """Canonical delivery summary derived only from validated JSON records."""
+    findings = summary['findings']
+    by_severity = {
+        severity: [item['id'] for item in findings if item['severity'] == severity]
+        for severity in SEVERITIES
+    }
+    required_failed = [
+        probe['name'] for probe in summary['probes']
+        if probe['required'] and probe['status'] in ('failed', 'error')
+    ]
+    reconcile = summary['reconcile']
+    blocked = bool(reconcile['pending'] or required_failed)
+    lines = [
+        '审查摘要（来自 JSON）',
+        'findings: high={high} medium={medium} low={low}'.format(
+            **{severity: len(by_severity[severity]) for severity in SEVERITIES}),
+        'high_ids: ' + (', '.join(by_severity['high']) or '-'),
+        'medium_ids: ' + (', '.join(by_severity['medium']) or '-'),
+        'low_ids: ' + (', '.join(by_severity['low']) or '-'),
+        'reconcile: total={total} done={done} pending={pending}'.format(**reconcile),
+        'required_failed: ' + (', '.join(required_failed) or 'none'),
+        'status: ' + ('阻塞' if blocked else '无已记录阻塞项'),
+    ]
+    return '\n'.join(lines)
+
+
 def update_report(directory, sections, check=False):
     path = directory / 'code-review.md'
     with path.open(encoding='utf-8-sig', newline='') as stream:
@@ -228,6 +255,7 @@ def main():
     output.add_argument('--render', action='store_true', help='Preview generated report sections')
     output.add_argument('--write-report', action='store_true', help='Replace generated report regions only')
     output.add_argument('--check-report', action='store_true', help='Verify every generated field without writing')
+    output.add_argument('--summary', action='store_true', help='Print the canonical delivery summary from validated JSON')
     args = parser.parse_args()
     try:
         summary = summarize(args.review_dir, args.registry, args.probes)
@@ -236,6 +264,8 @@ def main():
             sections = render_sections(summary)
             if args.write_report or args.check_report:
                 update_report(args.review_dir, sections, check=args.check_report)
+        if args.summary:
+            require(not args.probes, '摘要需要最终同步结果')
     except (ValueError, TypeError, OSError, yaml.YAMLError) as error:
         print(f'错误: {error}', file=sys.stderr)
         return 1
@@ -247,6 +277,8 @@ def main():
         print(events(summary))
     elif args.has_high:
         print(str(any(p['high'] for p in summary['probes'])).lower())
+    elif args.summary:
+        print(summary_text(summary))
     else:
         print(json.dumps(summary, ensure_ascii=False))
     return 0
