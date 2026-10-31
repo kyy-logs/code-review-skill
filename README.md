@@ -80,46 +80,13 @@ gate behavior may change before 1.0.
 
 ### Install
 
-The repository keeps the portable skill in `skills/code-review/`; installation copies it into your project. The installer does not overwrite existing files by default.
-
-Run this command **inside your project** to install the skill for Codex:
+Run this command **inside your project**:
 
 ```bash
-python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/main/scripts/install-remote.py', timeout=30).read())" --agent codex
+npx -y skills add kyy-logs/code-review-skill --agent codex --skill code-review --yes
 ```
 
-Requires Python 3.9+ and Git on `PATH`; use `python3` if that is your Python command. Replace `codex` with `claude-code` or `both` to select another host. The entry downloads main into a temporary directory, runs the installer, and removes the checkout afterward. You do not need to clone or enter this repository yourself.
-
-Append `--dry-run` to preview, `--project "/path/to/your-project"` to choose another project, or `--ref <branch-or-tag>` to select a source version that includes the installer. The remote entry defaults to `main`; use `--ref` to select another branch or tag.
-
-For a local checkout:
-
-```bash
-git clone --branch main https://github.com/kyy-logs/code-review-skill.git
-cd code-review-skill
-python scripts/install.py --agent both --project /path/to/your-project
-```
-
-Or use the shell wrapper:
-
-```bash
-bash scripts/install --agent codex --project /path/to/your-project
-```
-
-Host layouts:
-
-| Host | Skill directory |
-|---|---|
-| Claude Code | `.claude/skills/code-review/` |
-| Codex | `.agents/skills/code-review/` |
-
-`--agent` accepts `claude-code`, `codex`, or `both`. Existing files are protected: the installer exits with a conflict list; `--force` backs up the existing target before replacing it. `--dry-run` prints the plan. It never edits `.codex/config.toml` or other agents.
-
-`npx -y skills add ... --agent codex --yes` installs the skill only. Node.js 22.20+ is only needed for that optional `npx` path.
-
-For another host, install `skills/code-review/` into that host's skill directory. Only the Claude Code and Codex skill layouts are supplied.
-
-The installer copies only the skill. If Python cannot import PyYAML, install it with `python -m pip install PyYAML` in the interpreter used by the skill; `CODE_REVIEW_PYTHON` can select another interpreter.
+Use `--agent claude-code` for Claude Code. Codex installs to `.agents/skills/code-review/`; Claude Code installs to `.claude/skills/code-review/`. Node.js 22.20+ is required. This installs only the skill; there is no separate reviewer adapter.
 
 ### Run
 
@@ -258,8 +225,8 @@ The evaluation harness and raw reports are kept out of the published repository.
 
 - Claude Code with Agent Skills support, or Codex with custom-agent support.
 - Bash, Git, awk, grep, sed.
-- Python 3.9+; installation uses the standard library. PyYAML is required to run the review scripts for report parsing and metrics.
-- Node.js 22.20+ only if you use the optional `npx skills` shortcut for a skill-only install.
+- Python 3.9+ is required to run the review scripts; PyYAML is used for report parsing and metrics.
+- Node.js 22.20+ is required for the `npx skills` install entry.
 
 ## Repository layout
 
