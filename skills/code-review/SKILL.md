@@ -118,25 +118,22 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
    有未处置问题（`RECONCILE_PENDING > 0`）时，本轮仍交付报告并列明阻塞项，不得推进合入。
    后续修复任务完成后，再复审受影响的部分；重派上限见 `references/probes.yaml` 的 `execution.max_retry`。
 
-5. **汇总报告**：汇总 findings、未验证项及阻塞结论。
-   若提供了验收标准，须先按“可选收尾”完成勾验，再形成最终结论。
-   按模板撰写范围、解释、修复建议和限制，保留自动区域标记；原始 JSON 不写入正文。
-   脚本只替换报告 §5、§6 的 `code-review:probes` / `gate` 标记区域，保留其他正文。
-   执行以下命令直接生成事实区域并校验，不经模型复制表格：
+5. **汇总报告**：
+
+   按模板填写审查范围、解释、修复建议和限制，原始 JSON 不嵌入正文；提供了验收标准时，先完成逐条勾验。
+
+   执行以下命令，从 JSON 生成报告事实区、校验展示并取得最终答复摘要：
    ```bash
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" render-report {slug}
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" verify-report {slug}
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" summary {slug}
    ```
-   校验从相同 JSON 重新渲染并比对 ID、位置、证据、严重级别、状态和计数。
-   `summary` 会先校验报告，再输出最终答复可引用的机器摘要；报告不一致时不输出摘要。
-   最终答复中的 high/medium/low 数量、finding ID 和阻塞结论必须来自该摘要，
-   不得新增 JSON 中不存在的 finding，也不得省略 JSON 中已记录的 high。
-   渲染先完整校验再原子更新，可重复执行，不更改 JSON；标记缺失或重复时停止，不覆盖整份报告。
-   主执行器可补充解释及修复建议，不得改写自动区域或推翻已知阻塞结论。
-   自动区域的“无已记录阻塞项”不代表验收、覆盖率、测试或 CI 已通过。
-   `gate-pass {slug} code-review` 与有审查记录的 `archive` 会先校验报告，再同步计数，不会自动修正被改写的展示。
-   向用户交付报告、阻塞结论和未验证项。
+
+   脚本只更新报告 §5、§6 的 `code-review:probes` / `gate` 标记区域，保留其他正文和原始 JSON。渲染先校验再原子更新，可重复执行；标记缺失或重复时停止。校验覆盖 ID、位置、证据、严重级别、状态和计数。
+
+   `summary` 先校验报告，一致后才输出机器摘要。最终答复中的 high/medium/low 数量、finding ID 和阻塞结论须以摘要为准，不新增未记录的问题，不遗漏已记录的 high。向用户交付报告、阻塞项及未验证内容，可补充解释和建议，不得改写自动区域或推翻已知阻塞事实。
+
+   “无已记录阻塞项”不代表验收、覆盖率、测试或 CI 已通过。`gate-pass {slug} code-review` 与有审查记录的 `archive` 均先校验报告，再同步计数，不自动修正被改写的展示。
 
 ## <HARD-GATE>
 
