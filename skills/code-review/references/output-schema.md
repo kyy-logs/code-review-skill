@@ -1,14 +1,14 @@
 # 探针输出契约（finding）
 
-本文件统一定义 finding 字段、严重级别、处理状态及计数规则，供探针、reviewer 和 reconciliation 使用。
+本文件统一定义 finding 字段、严重级别、处理状态及计数规则，供探针和 reconciliation 使用。
 finding 是一条具体问题；`severity` 表示严重程度，finding 的 `status` 表示处理进度，探针状态表示一轮检查的执行结果。
 
 ## 1. 单条问题怎么写
 
 | 字段 | 填写要求 | 取值 | 说明 |
 |---|---|---|---|
-| `id` | 必填 | `<probe>-<序号>`；reviewer 新问题用 `R<序号>` | 全局唯一，序号从 1 开始，**必须稳定** |
-| `probe` | 必填 | 探针名；reviewer 新问题为 `reviewer` | 探针名取自 `references/probes.yaml` |
+| `id` | 必填 | `<probe>-<序号>` | 全局唯一，序号从 1 开始，**必须稳定** |
+| `probe` | 必填 | 探针名 | 探针名取自 `references/probes.yaml` |
 | `severity` | 必填 | `high` / `medium` / `low` | 见下方判定表 |
 | `status` | 必填 | `open` / `reconciled` / `wontfix` / `false-positive` | 见下方状态机 |
 | `location` | 必填 | `path:line` | 定位不到行时写到文件级，并说明原因 |
@@ -122,30 +122,6 @@ bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug} --probes
 
 `required` 从注册表读取，各级数量从 JSON 逐条计算，不再接受 `probe` / `reconcile` 手填计数。
 
-### Reviewer 记录
-
-reviewer 的原始结果单独保存为产物目录下的 `reviewer.json`，不嵌入最终报告：
-
-```json
-{
-  "decision": "run",
-  "verdicts": [{
-    "id": "repo-guard-1",
-    "verdict": "confirmed",
-    "severity": "high",
-    "evidence": "引用已核对的代码、契约及定级依据"
-  }],
-  "findings": []
-}
-```
-
-`decision`、`verdicts`、`findings` 必填。`skip` 另填非空 `reason`，两个数组须为空。
-裁决字段固定为 `id`、`verdict`、最终 `severity`、非空 `evidence`；规则见 `references/reviewer.md`。
-`confirmed` / `unverified` / `rejected` 保持原级别；降级、升级须符合方向。
-`rejected` 派生为 `false-positive`；`unverified` 保持 `open`。未裁决项保留原级别及现有状态。
-已标为误报的条目若被确认、降级或升级，重新记为 `open`，不继续算作已处置。
-reviewer 新问题只写入 `reviewer.json` 的 `findings`，字段同上表；原探针记录保留，不手动改成裁决后的版本。
-
 ## 5. 汇总与落盘
 
 ### 重复问题处理
@@ -157,7 +133,7 @@ reviewer 新问题只写入 `reviewer.json` 的 `findings`，字段同上表；�
 
 ### reconciliation 计数
 
-脚本按 ID 应用裁决并加入 reviewer 新问题后计算；只有最终 high finding 进入 reconciliation。
+脚本从探针原始 finding 计算；只有 high finding 进入 reconciliation。
 medium/low 记入报告，不计入 `RECONCILE_TOTAL`。探针原始计数不受合法降级或驳回影响。
 
 ```
@@ -167,22 +143,22 @@ RECONCILE_PENDING = TOTAL - DONE      # > 0 即阻塞合入
 ```
 
 最终同步：`bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug}`。
-记录缺失、JSON 格式错误、重复 ID、未知裁决 ID 或状态矛盾时失败，不写计数，不以旧结果放行。
+记录缺失、JSON 格式错误、重复 ID 或状态矛盾时失败，不写计数，不以旧结果放行。
 `gate-pass {slug} code-review` 与有审查记录的 `archive` 会先校验人类报告，再同步计数；不会自动修正被改写的展示。
 历史记录须明确迁移为独立 JSON；不尝试从自由文本猜测或自动补零，也不同时读取旧内嵌区块。
 
 ### 报告路径
 
-机器记录为 `docs/work/active/{slug}/probes/<探针名>.json` 和 `reviewer.json`。
+机器记录为 `docs/work/active/{slug}/probes/<探针名>.json`。
 人类报告固定为 `docs/work/active/{slug}/code-review.md`，按 `assets/code-review.md` 撰写说明。
-脚本直接替换 §5、§6、§7 中 `code-review:probes` / `reviewer` / `gate` 的 HTML 注释标记区域，保留其他正文：
+脚本直接替换 §5、§6 中 `code-review:probes` / `gate` 的 HTML 注释标记区域，保留其他正文：
 
 ```bash
 bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" render-report {slug}
 bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" verify-report {slug}
 ```
 
-展示校验从相同 JSON 重新渲染并比对全部自动区域，包括 ID、位置、证据、裁决、最终级别、状态和计数。
+展示校验从相同 JSON 重新渲染并比对全部自动区域，包括 ID、位置、证据、严重级别、状态和计数。
 渲染可重复执行，先完整校验再原子更新，不更改 JSON。标记缺失或重复时停止，不覆盖整份报告。
 自动区域的“无已记录阻塞项”仅描述问题与探针状态，不代表验收、覆盖率、测试或 CI 均通过。
 主执行器可补充解释及修复建议，但不得改写自动区域或作出与已知阻塞相矛盾的结论。

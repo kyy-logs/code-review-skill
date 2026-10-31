@@ -7,17 +7,6 @@ execution:
   mode: parallel
   max_retry: 1              # reconciliation 发现遗漏时重派的次数上限
 
-# scripts/review-mode 判断是否派发：always 总派，never 不派，auto 按 skip_when 决定。
-# no_findings 指无 high；only_docs 指改动全为 .md / .rst / .txt。
-# strict 在跳过且仍有 open high 时阻塞；advisory 只告警。
-
-reviewer:
-  mode: auto
-  skip_when:
-    - no_findings
-    - only_docs
-  policy: strict
-
 # requires 列出输入依赖；rules 默认使用内置规则，覆盖率由 test-coverage 内部可选处理。
 
 probes:

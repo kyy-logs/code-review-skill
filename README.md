@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 **Evidence-backed code review. Static-first, probe-driven, and gated.**
 
-The skill source lives in [`skills/code-review/`](skills/code-review/), independently of any host's installation directory. Reviewer adapters for Claude Code and Codex are included in [`adapters/`](adapters/). The current version is a beta release; see [VERSION](VERSION).
+The skill source lives in [`skills/code-review/`](skills/code-review/), independently of any host's installation directory. The current version is a beta release; see [VERSION](VERSION).
 
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-6B4FBB?style=flat-square)](https://claude.com/claude-code)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-standard-1f6feb?style=flat-square)](https://agentskills.io)
@@ -18,57 +18,37 @@ It never modifies the code under review.
 ## Latest news
 
 <!-- NEWS:START -->
-### v0.1.0-beta.2 (2026-10-31)
+### v0.1.0-beta.3 (2026-10-31)
 
-#### Added
+#### Removed
 
-- Parallel four-probe execution: each probe gets a fresh agent and writes its
-  own JSON; hosts without four slots run in batches or record a serial fallback.
-- Automatic NEWS unreleased updates and one-command remote skill installation.
+- Removed the independent reviewer and its Claude Code/Codex adapters. The four
+  probes now feed the report and gate directly from raw findings; `reviewer.json`,
+  `review-mode`, and reviewer-adapter installation are no longer used.
 
 #### Changed
 
-- Probe dispatch now includes bounded local-search and background-task cleanup
-  rules, and `behavior-review` starts from the diff and stops when evidence is
-  sufficient.
-- `test-coverage` hands valid measured coverage back to the main executor;
-  cross-probe duplicates remain separate records until a later deduplication
-  design is adopted.
-
-#### Fixed
-
-- `behavior-review` now checks asynchronous completion, exception, and
-  cancellation cleanup paths and distinguishes a cancel notification from the
-  task actually stopping.
-
-#### Validation
-
-- Same-version reviews showed lower wall-clock time with four parallel probes:
-  Keycloak about 2.5x, x01 about 2.9x, and the x01 impact-only repeat about
-  2.7x.
-- Token usage did not improve consistently, and target recall did not increase
-  (the x01 impact target was found in 1 of 3 serial and 1 of 3 parallel runs).
-  These are small samples; this is not a general speed or recall claim.
+- The installer now installs only the host skill layout. `--agent` selects the
+  Claude Code or Codex skill directory, not a reviewer adapter.
 
 [Full update history](NEWS.md)
 <!-- NEWS:END -->
 
 ## Release status
 
-`v0.1.0-beta.2` — this is a test release. The probe contract, report schema, and
+`v0.1.0-beta.3` — this is a test release. The probe contract, report schema, and
 gate behavior may change before 1.0.
 
 - **Severity is three levels:** `high`, `medium`, `low`. Records written by the
   earlier four-level version, including any `critical` value, are **not
   compatible**; `collect-metrics` rejects them. Re-run the review or migrate the
   records before using them with this release.
-- **Scope:** static-first review with four probes, an optional independent
-  reviewer, and JSON-derived report/gate output. It does not replace tests, CI,
-  or human review.
-- **Validation:** 50 offline pipeline, NEWS, and installation tests; a clean-project end-to-end run with
-  the reviewer and a failing gate; additional probe/reviewer smokes. These are
-  regression checks, not a general recall claim. Concurrency-defect detection
-  has not been validated.
+- **Scope:** static-first review with four probes and JSON-derived report/gate
+  output. It does not replace tests, CI, or human review.
+- **Validation:** 47 offline pipeline, NEWS, and installation tests; clean-project
+  end-to-end gate runs; additional probe smokes. These are regression checks,
+  not a general recall claim. Concurrency-defect detection has not been
+  validated.
 
 ## Contents
 
@@ -79,7 +59,6 @@ gate behavior may change before 1.0.
 - [How it works](#how-it-works)
 - [Evidence contract](#evidence-contract)
 - [Configuration](#configuration)
-- [Independent reviewer](#independent-reviewer)
 - [What this is not](#what-this-is-not)
 - [Validation](#validation)
 - [Requirements](#requirements)
@@ -94,7 +73,6 @@ gate behavior may change before 1.0.
 | **Static-first** | Works on a fresh clone or a partial checkout. Coverage is optional, not a prerequisite. |
 | **Evidence contract** | A finding without a location, summary, and checkable evidence is not a finding. |
 | **Four probes** | Behavior, tests, rules, and impact are separate questions with separate reports. |
-| **Independent reviewer** | Optional second context that sees the frozen inputs and raw findings — not the expected answer. |
 | **Machine-checkable gate** | Counts and blockers come from JSON, not from prose the model retyped. |
 | **Auditable output** | The human report and the JSON records are rendered from the same source and verified against each other. |
 
@@ -102,9 +80,9 @@ gate behavior may change before 1.0.
 
 ### Install
 
-The repository keeps the portable skill in `skills/code-review/`; installation copies it and the matching reviewer adapter into your project. The installer does not overwrite existing files by default.
+The repository keeps the portable skill in `skills/code-review/`; installation copies it into your project. The installer does not overwrite existing files by default.
 
-Run this command **inside your project** to install the skill and Codex reviewer together:
+Run this command **inside your project** to install the skill for Codex:
 
 ```bash
 python -c "import urllib.request; exec(urllib.request.urlopen('https://raw.githubusercontent.com/kyy-logs/code-review-skill/main/scripts/install-remote.py', timeout=30).read())" --agent codex
@@ -130,18 +108,18 @@ bash scripts/install --agent codex --project /path/to/your-project
 
 Host layouts:
 
-| Host | Skill | Reviewer adapter | Dispatch |
-|---|---|---|---|
-| Claude Code | `.claude/skills/code-review/` | `.claude/agents/reviewer.md` | `subagent_type: reviewer` |
-| Codex | `.agents/skills/code-review/` | `.codex/agents/reviewer.toml` | custom agent `reviewer` (`agent_type: reviewer`) |
+| Host | Skill directory |
+|---|---|
+| Claude Code | `.claude/skills/code-review/` |
+| Codex | `.agents/skills/code-review/` |
 
 `--agent` accepts `claude-code`, `codex`, or `both`. Existing files are protected: the installer exits with a conflict list; `--force` backs up the existing target before replacing it. `--dry-run` prints the plan. It never edits `.codex/config.toml` or other agents.
 
-`npx -y skills add ... --agent codex --yes` installs the skill only; it does not install the reviewer adapter. Use the installer above for the independent reviewer. Node.js 22.20+ is only needed for that optional `npx` path.
+`npx -y skills add ... --agent codex --yes` installs the skill only. Node.js 22.20+ is only needed for that optional `npx` path.
 
-For another host, install `skills/code-review/` into that host's skill directory and provide its own independent-context mechanism. Only the Claude Code and Codex adapters are supplied.
+For another host, install `skills/code-review/` into that host's skill directory. Only the Claude Code and Codex skill layouts are supplied.
 
-Both copies are needed for the full workflow: installing the skill alone does not register the independent reviewer. If Python cannot import PyYAML, install it with `python -m pip install PyYAML` in the interpreter used by the skill; `CODE_REVIEW_PYTHON` can select another interpreter.
+The installer copies only the skill. If Python cannot import PyYAML, install it with `python -m pip install PyYAML` in the interpreter used by the skill; `CODE_REVIEW_PYTHON` can select another interpreter.
 
 ### Run
 
@@ -173,7 +151,6 @@ The skill supports two review modes:
 ```text
 docs/work/active/{slug}/
 ├── code-review.md      # human report
-├── reviewer.json       # independent reviewer verdicts (optional)
 └── probes/
     ├── behavior-review.json
     ├── test-coverage.json
@@ -184,16 +161,15 @@ docs/work/active/{slug}/
 ## How it works
 
 ```text
-scope ──► probes ──► sync ──► reviewer? ──► reconcile ──► report ──► gate
+scope ──► probes ──► sync ──► reconcile ──► report ──► gate
 ```
 
 1. **Scope** — determine `worktree` or `commits`; record base and head as commit IDs.
 2. **Probes** — dispatch four independent agents with the same scope and diff, each writing its own probe JSON. Run in batches if host capacity is limited, or record a serial fallback if agents are unavailable. Cross-probe duplicates are retained and counted; actual speed and token savings remain unverified.
 3. **Sync** — validate probe JSON and derive counts with `collect-metrics`.
-4. **Reviewer (optional)** — dispatch only when `review-mode` returns `run`.
-5. **Reconcile** — high findings must be closed or explicitly rejected.
-6. **Report** — render the human report’s fact sections from JSON, then verify them.
-7. **Gate** — required-probe failures and open high findings block the merge.
+4. **Reconcile** — high findings must be closed or explicitly rejected.
+5. **Report** — render the human report’s fact sections from JSON, then verify them.
+6. **Gate** — required-probe failures and open high findings block the merge.
 
 ### The four probes
 
@@ -222,16 +198,7 @@ High-severity findings must cite the actual method signature and the contract th
 
 ## Configuration
 
-`references/probes.yaml` controls the probe registry and reviewer policy:
-
-```yaml
-reviewer:
-  mode: auto        # auto | always | never
-  skip_when:
-    - no_findings
-    - only_docs
-  policy: strict    # strict | advisory
-```
+`references/probes.yaml` controls the probe registry:
 
 Project-specific rules can live in `.code-review/rules/`, or be pointed to with `CODE_REVIEW_RULES_DIR`:
 
@@ -240,12 +207,6 @@ export CODE_REVIEW_RULES_DIR=/path/to/rules
 ```
 
 A project rule package **replaces** the built-in package; it is not merged with it.
-
-## Independent reviewer
-
-`skills/code-review/references/reviewer.md` is the host-neutral reviewer script. `adapters/claude-code/reviewer.md` is the Claude Code adapter (installed at `.claude/agents/reviewer.md`); `adapters/codex/reviewer.toml` is the Codex custom-agent definition (installed at `.codex/agents/reviewer.toml`). Both adapters only provide host routing and point back to the same reviewer script.
-
-The reviewer gets the frozen skill, the case inputs, and the raw probe bundle — not reference comments, expected answers, or prior reports. If the host cannot provide a fresh context, record that limitation; do not fabricate a verdict.
 
 ## What this is not
 
@@ -260,7 +221,7 @@ The reviewer gets the frozen skill, the case inputs, and the raw probe bundle �
 <summary>11-case historical Java regression (2026-10-29)</summary>
 
 - Baseline: commit `494a39bb`, before `behavior-review` was extracted into a standalone probe. The snapshot validates the shared finding and gate contract, not the four-probe split itself.
-- 11/11 cases completed; reviewer off; static review.
+- 11/11 cases completed; static review.
 - Original behavior targets: 5/5 hit; including two independently confirmed edge cases, 5/7 required targets were found.
 - Clean and fixed controls: 4/4 passed without false blocking.
 - Two confirmed edge-case misses remain: legal input formatting in a parser, and a JSON representation round-trip in command rendering.
@@ -325,18 +286,13 @@ code-review-skill/
 │       ├── references/
 │       │   ├── probes.yaml
 │       │   ├── output-schema.md
-│       │   ├── reviewer.md
 │       │   ├── probes/
 │       │   └── rules/
 │       └── scripts/
-│           ├── review-mode
 │           ├── collect-metrics
 │           ├── lib-metrics
 │           ├── rule-grep
 │           └── sync-results.py
-├── adapters/
-│   ├── claude-code/reviewer.md
-│   └── codex/reviewer.toml
 └── tests/
 ```
 
