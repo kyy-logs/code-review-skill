@@ -46,7 +46,7 @@ gate behavior may change before 1.0.
   records before using them with this release.
 - **Scope:** static-first review with four probes and JSON-derived report/gate
   output. It does not replace tests, CI, or human review.
-- **Validation:** 49 offline pipeline, NEWS, and installation tests; clean-project
+- **Validation:** 52 offline pipeline, NEWS, and installation tests; clean-project
   end-to-end gate runs; additional probe smokes. These are regression checks,
   not a general recall claim. Concurrency-defect detection has not been
   validated.
@@ -219,6 +219,18 @@ not be reported as recursion. Passing a control does not establish that its
 entire change is defect-free.
 
 The evaluation harness and raw reports are kept out of the published repository. This snapshot is a regression result, not a claim of general recall.
+
+</details>
+
+<details>
+<summary>9-case expansion (2026-10-30)</summary>
+
+- Separate run `2026-10-30-review9-1a4adc1` on an older `main` (`1a4adc1`); it did not re-run the 11 historical cases. Do not combine the two batches into a 20/20 claim.
+- 9/9 cases completed; 36/36 probe records; 0 probe errors or skipped cases.
+- Positive targets: 4/6. Fixed controls: 3/3 stopped reporting.
+- 22 raw findings: 7 high, 13 medium, 2 low. This older run used the reviewer (5 run / 4 skip); the current skill has no independent reviewer.
+- Confirmed misses: x01's legal `d` flag and x04's cancellation/loading lifecycle.
+- Severity or contract caveats remain for several cases, including x02, x05, x06, and x08; this is not a general recall claim.
 
 </details>
 
