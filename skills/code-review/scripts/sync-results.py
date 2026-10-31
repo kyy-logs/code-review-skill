@@ -178,6 +178,10 @@ def update_report(directory, sections, check=False):
     source = raw.replace('\r\n', '\n')
     require(not re.search(r'^```json probe-result\b', source, re.M),
             '原始记录须保存为独立 JSON，最终报告不得嵌入机器记录区块')
+    require('<!-- code-review:reviewer:start -->' not in source
+            and '<!-- code-review:reviewer:end -->' not in source
+            and re.search(r'^```json reviewer-result', source, re.M) is None,
+            '报告仍包含旧版 Reviewer 区域；reviewer 功能已移除，请迁移或删除该区域后重新渲染')
     updated = source
     for name, content in sections.items():
         begin, end = f'<!-- code-review:{name}:start -->', f'<!-- code-review:{name}:end -->'

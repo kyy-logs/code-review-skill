@@ -134,7 +134,7 @@ bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug} --probes
 ### reconciliation 计数
 
 脚本从探针原始 finding 计算；只有 high finding 进入 reconciliation。
-medium/low 记入报告，不计入 `RECONCILE_TOTAL`。探针原始计数不受合法降级或驳回影响。
+medium/low 记入报告，不计入 `RECONCILE_TOTAL`。
 
 ```
 RECONCILE_TOTAL   = high 的 finding 总数

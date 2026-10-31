@@ -115,6 +115,17 @@ class BehaviorRecordsTests(BehaviorFixture, unittest.TestCase):
         path.write_text(report.replace('behavior-review-1', 'behavior-review-9'), encoding='utf-8')
         self.assertNotEqual(self.helper('--check-report').returncode, 0)
 
+    def test_legacy_reviewer_region_requires_removal(self):
+        path = self.review / 'code-review.md'
+        legacy = path.read_text(encoding='utf-8') + (
+            chr(10) + '<!-- code-review:reviewer:start -->' + chr(10) + 'old verdict' + chr(10)
+            + '<!-- code-review:reviewer:end -->' + chr(10))
+        path.write_text(legacy, encoding='utf-8')
+        result = self.helper('--write-report')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('旧版 Reviewer', result.stderr)
+        self.assertEqual(path.read_text(encoding='utf-8'), legacy)
+
     def test_historical_three_probe_run_still_uses_its_frozen_registry(self):
         configuration = yaml.safe_load(self.registry.read_text(encoding='utf-8'))
         configuration['probes'] = [p for p in configuration['probes'] if p['name'] != 'behavior-review']

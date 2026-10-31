@@ -45,7 +45,7 @@ gate behavior may change before 1.0.
   records before using them with this release.
 - **Scope:** static-first review with four probes and JSON-derived report/gate
   output. It does not replace tests, CI, or human review.
-- **Validation:** 47 offline pipeline, NEWS, and installation tests; clean-project
+- **Validation:** 49 offline pipeline, NEWS, and installation tests; clean-project
   end-to-end gate runs; additional probe smokes. These are regression checks,
   not a general recall claim. Concurrency-defect detection has not been
   validated.
@@ -167,7 +167,7 @@ scope ──► probes ──► sync ──► reconcile ──► report ─�
 1. **Scope** — determine `worktree` or `commits`; record base and head as commit IDs.
 2. **Probes** — dispatch four independent agents with the same scope and diff, each writing its own probe JSON. Run in batches if host capacity is limited, or record a serial fallback if agents are unavailable. Cross-probe duplicates are retained and counted; actual speed and token savings remain unverified.
 3. **Sync** — validate probe JSON and derive counts with `collect-metrics`.
-4. **Reconcile** — high findings must be closed or explicitly rejected.
+4. **Reconcile** — high findings must be closed or marked false-positive by the probe.
 5. **Report** — render the human report’s fact sections from JSON, then verify them.
 6. **Gate** — required-probe failures and open high findings block the merge.
 

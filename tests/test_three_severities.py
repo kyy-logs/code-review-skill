@@ -35,6 +35,18 @@ class ThreeSeverityTests(BehaviorFixture, unittest.TestCase):
                 self.assertNotEqual(self.helper('--probes').returncode, 0)
 
 
+    def test_raw_reconciled_high_closes_reconciliation(self):
+        self.add_high()
+        finding = self.records['behavior-review']['findings'][0]
+        finding['status'] = 'reconciled'
+        finding['reconciled_by'] = 'Fixed in follow-up'
+        self.records['behavior-review']['status'] = 'passed'
+        self.write_records()
+        result = self.summary()
+        self.assertEqual(result['probes'][0]['high'], 1)
+        self.assertEqual(result['reconcile'], dict(total=1, done=1, pending=0))
+        self.assertEqual(result['findings'][0]['status'], 'reconciled')
+
 @unittest.skipUnless(os.environ.get('CODE_REVIEW_TEST_BASH'), 'Bash is required')
 class ThreeSeverityGateTests(BehaviorFixture, unittest.TestCase):
     command = fixtures.BehaviorGateTests.command
