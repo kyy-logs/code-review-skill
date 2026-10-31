@@ -76,7 +76,7 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
 3. **并行执行探针**：
 
    **派发**：主执行器按注册表为每个探针派发独立代理，提供审查范围、diff、项目根、skill 路径及该探针的输入和 `params`，并在派发提示中包含上文“执行边界”和本步骤“执行”段的公共约束。
-   代理读取注册项 `file` 指向的说明和输出契约，按参数执行。
+   代理读取注册项 `file` 指向的说明和 `references/output-schema.md`，按参数执行。
    并发槽位不足时分批执行；没有独立代理能力时串行执行并记录限制。
 
    **执行**：代理只检查自己的探针，不重跑完整流程或再派发代理；源码版本遵循步骤 1。
@@ -93,29 +93,45 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
    `test-coverage` 通过返回消息交接有效覆盖率的报告路径、目标版本、分子/分母及百分比，
    由主执行器执行 `collect-metrics coverage`；未测量时不补数值。
 
-   **汇总**：等待所有代理结束，由主执行器统一同步，不改写原始结果或手填计数。
-   暂不做跨探针去重，计数可能包含重复问题：
+   **汇总**：等待所有代理结束，由主执行器统一同步；`required` 从注册表读取，各级数量从 JSON 逐条计算，不改写原始结果或手填计数。
+   暂不做跨探针去重，按原始 finding ID 计数，可能包含同根因问题的重复记录：
    ```bash
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug} --probes
    ```
+   此步使上一批对账状态失效，尚不记录 reconciliation。
+   历史重复记录保留原始 ID、证据及计数；展示独立问题数量时按同一根因和后果归组并列明对应 ID，不因重复提高严重级别，也不以展示数量替代探针或对账计数。
 
 4. **reconciliation 完整性检查**：
    从探针 JSON 自动派生最终计数：
    ```bash
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug}
    ```
-   没有 high 也须执行，显式记录零结果；格式错误须修正，不能用旧计数或手填数字代替。
+   `required` 只控制该探针的 `failed/error` 执行状态是否直接阻塞，不改变 finding 的闭环要求。
+   任意探针的 high finding 都进入 reconciliation，未闭环仍阻塞合入；medium/low 记入报告，不计入对账总数：
+   ```text
+   RECONCILE_TOTAL   = high finding 总数
+   RECONCILE_DONE    = 其中 status 为 reconciled 或 false-positive 的条数
+   RECONCILE_PENDING = TOTAL - DONE
+   ```
+   没有 high 也须执行，显式记录零结果，不能用旧计数或手填数字代替。
+   格式错误须先修正；记录缺失、重复 ID 或状态矛盾时同步失败，不写计数，不以旧结果放行。
    有未处置问题（`RECONCILE_PENDING > 0`）时，本轮仍交付报告并列明阻塞项，不得推进合入。
    后续修复任务完成后，再复审受影响的部分；重派上限见 `references/probes.yaml` 的 `execution.max_retry`。
 
-5. **汇总报告**：按输出契约汇总 findings、未验证项及阻塞结论。
+5. **汇总报告**：汇总 findings、未验证项及阻塞结论。
    若提供了验收标准，须先按“可选收尾”完成勾验，再形成最终结论。
    按模板撰写范围、解释、修复建议和限制，保留自动区域标记；原始 JSON 不写入正文。
+   脚本只替换报告 §5、§6 的 `code-review:probes` / `gate` 标记区域，保留其他正文。
    执行以下命令直接生成事实区域并校验，不经模型复制表格：
    ```bash
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" render-report {slug}
    bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" verify-report {slug}
    ```
+   校验从相同 JSON 重新渲染并比对 ID、位置、证据、严重级别、状态和计数。
+   渲染先完整校验再原子更新，可重复执行，不更改 JSON；标记缺失或重复时停止，不覆盖整份报告。
+   主执行器可补充解释及修复建议，不得改写自动区域或推翻已知阻塞结论。
+   自动区域的“无已记录阻塞项”不代表验收、覆盖率、测试或 CI 已通过。
+   `gate-pass {slug} code-review` 与有审查记录的 `archive` 会先校验报告，再同步计数，不会自动修正被改写的展示。
    向用户交付报告、阻塞结论和未验证项。
 
 ## <HARD-GATE>
@@ -141,6 +157,8 @@ description: 写完代码、提交前或合并 PR 时使用；用户说“帮我
   `assets/code-review.md` 的章节和填写要求生成。
 - **机器记录**：`docs/work/active/{slug}/probes/<探针名>.json`，
   格式见 `references/output-schema.md`；人类报告的事实区域由它们派生。
+
+历史记录须明确迁移为独立 JSON；不从自由文本猜测或自动补零，也不同时读取旧内嵌区块。
 
 ## 可选收尾
 

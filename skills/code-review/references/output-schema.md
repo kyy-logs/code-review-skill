@@ -1,6 +1,6 @@
 # 探针输出契约（finding）
 
-本文件统一定义 finding 字段、严重级别、处理状态及计数规则，供探针和 reconciliation 使用。
+本文件统一定义 finding 字段、严重级别、处理状态及探针执行状态，供各探针填写独立 JSON 时使用。
 finding 是一条具体问题；`severity` 表示严重程度，finding 的 `status` 表示处理进度，探针状态表示一轮检查的执行结果。
 
 ## 1. 单条问题怎么写
@@ -108,57 +108,5 @@ high finding 处置后，重新执行对应探针并上报结果，不得直接�
 | `skipped` | **按探针约定正常跳过**，例如本轮未提供 `requires` 所需的可选输入；必须写明原因。**不算失败** |
 | `error` | 已指定输入的路径不存在、无法读取或解析，或命令 / 工具执行失败。仅 `required=true` 时，与 `failed` 一样计入 `PROBE_REQUIRED_FAILED` |
 
-`required` 只控制该探针的 `failed/error` 执行状态是否直接阻塞，不改变 finding 的闭环要求。
-任意探针的 high finding 都进入 reconciliation，未闭环仍阻塞合入。
-
 已指定的覆盖率报告路径读不到时，应记为 `error`。
 默认配置指向的资源缺失或损坏同样属于 `error`，不得伪装成正常跳过。
-
-所有探针报告写完后同步原始结果，并使上一批对账状态失效；此时尚不记录 reconciliation：
-
-```bash
-bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug} --probes
-```
-
-`required` 从注册表读取，各级数量从 JSON 逐条计算，不再接受 `probe` / `reconcile` 手填计数。
-
-## 5. 汇总与落盘
-
-### 重复问题处理
-
-- **新运行**：各探针独立报告，暂不做跨探针去重；按原始 finding ID 计数，可能包含同根因问题的重复记录。
-- **历史重复记录**：保留原始 finding ID、证据及计数，不因归组而改写原始 JSON。
-  展示独立问题数量时，按同一根因和后果归组并列明对应 ID，不因重复而提高严重级别。
-  该展示数量不替代探针上报数量或 reconciliation 计数。
-
-### reconciliation 计数
-
-脚本从探针原始 finding 计算；只有 high finding 进入 reconciliation。
-medium/low 记入报告，不计入 `RECONCILE_TOTAL`。
-
-```
-RECONCILE_TOTAL   = high 的 finding 总数
-RECONCILE_DONE    = 其中 status ∈ {reconciled, false-positive} 的条数
-RECONCILE_PENDING = TOTAL - DONE      # > 0 即阻塞合入
-```
-
-最终同步：`bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" sync {slug}`。
-记录缺失、JSON 格式错误、重复 ID 或状态矛盾时失败，不写计数，不以旧结果放行。
-`gate-pass {slug} code-review` 与有审查记录的 `archive` 会先校验人类报告，再同步计数；不会自动修正被改写的展示。
-历史记录须明确迁移为独立 JSON；不尝试从自由文本猜测或自动补零，也不同时读取旧内嵌区块。
-
-### 报告路径
-
-机器记录为 `docs/work/active/{slug}/probes/<探针名>.json`。
-人类报告固定为 `docs/work/active/{slug}/code-review.md`，按 `assets/code-review.md` 撰写说明。
-脚本直接替换 §5、§6 中 `code-review:probes` / `gate` 的 HTML 注释标记区域，保留其他正文：
-
-```bash
-bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" render-report {slug}
-bash "$CODE_REVIEW_SKILL_DIR/scripts/collect-metrics" verify-report {slug}
-```
-
-展示校验从相同 JSON 重新渲染并比对全部自动区域，包括 ID、位置、证据、严重级别、状态和计数。
-渲染可重复执行，先完整校验再原子更新，不更改 JSON。标记缺失或重复时停止，不覆盖整份报告。
-自动区域的“无已记录阻塞项”仅描述问题与探针状态，不代表验收、覆盖率、测试或 CI 均通过。
-主执行器可补充解释及修复建议，但不得改写自动区域或作出与已知阻塞相矛盾的结论。
