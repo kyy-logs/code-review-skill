@@ -243,6 +243,7 @@ code-review-skill/
 ├── VERSION
 ├── .github/workflows/
 │   ├── news-update.yml
+│   ├── star-history.yml
 │   └── sync-news.yml
 ├── scripts/
 │   ├── install
@@ -269,7 +270,9 @@ code-review-skill/
 
 ## Star 趋势
 
-[![Star History Chart](https://api.star-history.com/svg?repos=kyy-logs/code-review-skill&type=Date)](https://star-history.com/#kyy-logs/code-review-skill&Date)
+[![Star History Chart](https://raw.githubusercontent.com/kyy-logs/code-review-skill/star-history/star-history.svg)](https://star-history.com/#kyy-logs/code-review-skill&Date)
+
+由 [`star-history.yml`](.github/workflows/star-history.yml) 每天自动更新。
 
 ## 参与贡献
 
